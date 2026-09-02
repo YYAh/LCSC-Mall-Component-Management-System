@@ -12,7 +12,11 @@ Page({
 
     // Online Sync
     syncEnabled: false,
+    syncMode: 'feishu_bitable_api',
     webhookUrl: '',
+    feishuAppId: '',
+    feishuAppSecret: '',
+    feishuAppToken: 'YXgxbYlJSatOnvsQzDNcW7JQnng',
     testingSync: false,
     pushingAll: false
   },
@@ -23,7 +27,11 @@ Page({
       engineMode: api.getEngineMode(),
       serverUrl: api.getServerUrl(),
       syncEnabled: syncCfg.enabled,
-      webhookUrl: syncCfg.webhookUrl
+      syncMode: syncCfg.syncMode || 'feishu_bitable_api',
+      webhookUrl: syncCfg.webhookUrl,
+      feishuAppId: syncCfg.feishuAppId,
+      feishuAppSecret: syncCfg.feishuAppSecret,
+      feishuAppToken: syncCfg.feishuAppToken || 'YXgxbYlJSatOnvsQzDNcW7JQnng'
     });
     this.loadSavedBle();
   },
@@ -79,50 +87,85 @@ Page({
     });
   },
 
+  changeSyncMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    onlineSync.saveSyncConfig({ syncMode: mode });
+    this.setData({ syncMode: mode });
+  },
+
   onWebhookUrlInput(e) {
     const url = e.detail.value;
     onlineSync.saveSyncConfig({ webhookUrl: url });
     this.setData({ webhookUrl: url });
   },
 
+  onFeishuAppTokenInput(e) {
+    const val = e.detail.value;
+    onlineSync.saveSyncConfig({ feishuAppToken: val });
+    this.setData({ feishuAppToken: val });
+  },
+
+  onFeishuAppIdInput(e) {
+    const val = e.detail.value;
+    onlineSync.saveSyncConfig({ feishuAppId: val });
+    this.setData({ feishuAppId: val });
+  },
+
+  onFeishuAppSecretInput(e) {
+    const val = e.detail.value;
+    onlineSync.saveSyncConfig({ feishuAppSecret: val });
+    this.setData({ feishuAppSecret: val });
+  },
+
   async testSyncConnection() {
-    const url = this.data.webhookUrl.trim();
-    if (!url) {
-      wx.showToast({ title: '请先输入 Webhook 链接', icon: 'none' });
-      return;
-    }
-    onlineSync.saveSyncConfig({ webhookUrl: url });
+    onlineSync.saveSyncConfig({
+      syncMode: this.data.syncMode,
+      feishuAppId: this.data.feishuAppId,
+      feishuAppSecret: this.data.feishuAppSecret,
+      feishuAppToken: this.data.feishuAppToken,
+      webhookUrl: this.data.webhookUrl
+    });
 
     this.setData({ testingSync: true });
-    wx.showLoading({ title: '发送测试请求...' });
+    wx.showLoading({ title: '测试飞书连接...' });
 
     try {
-      await onlineSync.testWebhookConnection(url);
+      const res = await onlineSync.testSyncConnection();
       wx.hideLoading();
       this.setData({ testingSync: false });
-      wx.showModal({
-        title: '🎉 连通测试成功！',
-        content: '在线表格 / 飞书机器人已成功接收到测试数据！\n\n后续每次元器件录入、领料出库都会自动实时同步到该表格。',
-        showCancel: false
-      });
+      if (this.data.syncMode === 'feishu_bitable_api') {
+        wx.showModal({
+          title: '🎉 飞书多维表格连接成功！',
+          content: `已成功连接到多维表格！\n• 数据表 ID: ${res.tableId || '默认数据表'}\n• 模式: 100% 免费数据行直接写入\n\n后续每次扫码入库、领料出库都会自动更新多维表格中对应的行数据！`,
+          showCancel: false
+        });
+      } else {
+        wx.showModal({
+          title: '🎉 Webhook 连接成功！',
+          content: '已成功发送测试数据包到 Webhook！',
+          showCancel: false
+        });
+      }
     } catch (err) {
       wx.hideLoading();
       this.setData({ testingSync: false });
       wx.showModal({
-        title: '测试推送失败',
-        content: err.message || '请检查 Webhook 链接是否正确，或网络是否通畅',
+        title: '连接测试失败',
+        content: err.message || '请检查凭证是否正确或网络连接',
         showCancel: false
       });
     }
   },
 
   async pushAllToOnlineSheet() {
-    const url = this.data.webhookUrl.trim();
-    if (!url) {
-      wx.showToast({ title: '请先输入 Webhook 链接', icon: 'none' });
-      return;
-    }
-    onlineSync.saveSyncConfig({ webhookUrl: url, enabled: true });
+    onlineSync.saveSyncConfig({
+      enabled: true,
+      syncMode: this.data.syncMode,
+      feishuAppId: this.data.feishuAppId,
+      feishuAppSecret: this.data.feishuAppSecret,
+      feishuAppToken: this.data.feishuAppToken,
+      webhookUrl: this.data.webhookUrl
+    });
     this.setData({ syncEnabled: true, pushingAll: true });
 
     wx.showLoading({ title: '读取库中全部物料...' });
@@ -136,14 +179,14 @@ Page({
         return;
       }
 
-      wx.showLoading({ title: `正在推送 ${list.length} 种物料...` });
-      await onlineSync.syncAllComponents(list);
+      wx.showLoading({ title: `正在写入 ${list.length} 种物料到多维表格...` });
+      const syncRes = await onlineSync.syncAllComponents(list);
 
       wx.hideLoading();
       this.setData({ pushingAll: false });
       wx.showModal({
         title: '✅ 全量同步成功！',
-        content: `已成功将库中现有的 ${list.length} 种元器件完整推送到在线表格！`,
+        content: `已成功将库中现有的 ${syncRes.count || list.length} 种元器件完整写入飞书多维表格（图 1 样式）！`,
         showCancel: false
       });
     } catch (err) {
