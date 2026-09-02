@@ -4,7 +4,7 @@ const http = require('http');
 const router = express.Router();
 
 router.post('/webhook', (req, res) => {
-  const { url, data } = req.body;
+  const { url, data, method = 'POST', header = {} } = req.body;
   if (!url) {
     return res.status(400).json({ success: false, msg: 'Missing webhook url' });
   }
@@ -14,17 +14,23 @@ router.post('/webhook', (req, res) => {
     const targetUrl = new URL(url);
     const client = targetUrl.protocol === 'https:' ? https : http;
 
+    const reqHeaders = {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LCSC-Inventory-Sync/1.0',
+      ...header
+    };
+
+    if (method.toUpperCase() !== 'GET') {
+      reqHeaders['Content-Length'] = Buffer.byteLength(postData);
+    }
+
     const options = {
       hostname: targetUrl.hostname,
       port: targetUrl.port || (targetUrl.protocol === 'https:' ? 443 : 80),
       path: targetUrl.pathname + targetUrl.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) LCSC-Inventory-Sync/1.0'
-      },
-      timeout: 10000
+      method: method.toUpperCase(),
+      headers: reqHeaders,
+      timeout: 12000
     };
 
     const proxyReq = client.request(options, (proxyRes) => {
