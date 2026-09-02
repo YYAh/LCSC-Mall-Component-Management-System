@@ -115,8 +115,37 @@ function syncStockEvent(payload = {}) {
   const eventTitle = eventNameMap[payload.event] || '🔄 库存更新';
   const comp = payload.component || {};
 
-  const isFeishuBot = config.webhookUrl.includes('feishu.cn') || config.webhookUrl.includes('larksuite.com');
-  
+  // Prepare structured table payload (Matching user's exact spreadsheet columns in Image 1)
+  const tableRecord = {
+    '大类': comp.category || '未分类',
+    '厂家型号(PM)': comp.mpn || comp.name || '',
+    '立创编号(PC)': comp.c_code || '',
+    '品牌': comp.brand || '',
+    '封装': comp.package_name || '',
+    '参数值': comp.spec || '',
+    '库存数量': Number(payload.balanceQty !== undefined ? payload.balanceQty : comp.stock) || 0,
+    '样品册仓位': comp.location_text || '',
+    '变动数量': payload.changeQty || 0,
+    '变动类型': eventTitle,
+    '更新时间': nowStr,
+    '备注': payload.remark || comp.order_no || '',
+
+    // English aliases
+    category: comp.category || '未分类',
+    mpn: comp.mpn || comp.name || '',
+    c_code: comp.c_code || '',
+    brand: comp.brand || '',
+    package_name: comp.package_name || '',
+    spec: comp.spec || '',
+    stock: Number(payload.balanceQty !== undefined ? payload.balanceQty : comp.stock) || 0,
+    location_text: comp.location_text || '',
+    event: payload.event,
+    event_name: eventTitle,
+    change_qty: payload.changeQty || 0,
+    balance_qty: Number(payload.balanceQty !== undefined ? payload.balanceQty : comp.stock) || 0,
+    time: nowStr
+  };
+
   let requestData;
   if (isFeishuBot) {
     const changeText = payload.changeQty > 0 ? `+${payload.changeQty}` : `${payload.changeQty || 0}`;
@@ -135,16 +164,16 @@ function syncStockEvent(payload = {}) {
           {
             tag: 'div',
             fields: [
-              { is_short: true, text: { tag: 'lark_md', content: `**型号 (MPN):**\n${comp.mpn || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**立创编号:**\n${comp.c_code || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**分类:**\n${comp.category || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**原厂品牌:**\n${comp.brand || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**参数规格:**\n${comp.spec || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**封装形式:**\n${comp.package_name || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**大类:**\n${comp.category || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**厂家型号(PM):**\n${comp.mpn || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**立创编号(PC):**\n${comp.c_code || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**品牌:**\n${comp.brand || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**参数值:**\n${comp.spec || '-'}` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**封装:**\n${comp.package_name || '-'}` } },
               { is_short: true, text: { tag: 'lark_md', content: `**变动数量:**\n**${changeText}** 个` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**当前总库存:**\n**${payload.balanceQty !== undefined ? payload.balanceQty : comp.stock}** 个` } },
+              { is_short: true, text: { tag: 'lark_md', content: `**库存数量:**\n**${payload.balanceQty !== undefined ? payload.balanceQty : comp.stock}** 个` } },
               { is_short: true, text: { tag: 'lark_md', content: `**样品册仓位:**\n${comp.location_text || '-'}` } },
-              { is_short: true, text: { tag: 'lark_md', content: `**操作时间:**\n${nowStr}` } }
+              { is_short: true, text: { tag: 'lark_md', content: `**更新时间:**\n${nowStr}` } }
             ]
           },
           payload.remark ? {
@@ -152,32 +181,12 @@ function syncStockEvent(payload = {}) {
             elements: [{ tag: 'plain_text', content: `备注说明: ${payload.remark}` }]
           } : null
         ].filter(Boolean)
-      }
+      },
+      // Raw data fields for Bitable automation ingestion
+      ...tableRecord
     };
   } else {
-    requestData = {
-      event: payload.event,
-      event_name: eventTitle,
-      time: nowStr,
-      timestamp: Date.now(),
-      change_qty: payload.changeQty || 0,
-      balance_qty: payload.balanceQty !== undefined ? payload.balanceQty : comp.stock,
-      remark: payload.remark || '',
-      order_no: payload.orderNo || comp.order_no || '',
-      component: {
-        id: comp.id || comp._id,
-        mpn: comp.mpn,
-        c_code: comp.c_code,
-        name: comp.name,
-        category: comp.category,
-        brand: comp.brand,
-        spec: comp.spec,
-        package_name: comp.package_name,
-        stock: payload.balanceQty !== undefined ? payload.balanceQty : comp.stock,
-        safe_stock: comp.safe_stock,
-        location_text: comp.location_text
-      }
-    };
+    requestData = tableRecord;
   }
 
   return sendHttpRequest({
@@ -251,6 +260,18 @@ async function syncAllComponents(components = []) {
   const nowStr = new Date().toLocaleString();
   const isFeishu = config.webhookUrl.includes('feishu.cn') || config.webhookUrl.includes('larksuite.com');
 
+  const formattedItems = components.map(c => ({
+    '大类': c.category || '未分类',
+    '厂家型号(PM)': c.mpn || c.name || '',
+    '立创编号(PC)': c.c_code || '',
+    '品牌': c.brand || '',
+    '封装': c.package_name || '',
+    '参数值': c.spec || '',
+    '库存数量': Number(c.stock) || 0,
+    '样品册仓位': c.location_text || '',
+    '安全库存': Number(c.safe_stock) || 5
+  }));
+
   if (isFeishu) {
     const topComps = components.slice(0, 10).map(c => `• **[${c.c_code || '无编号'}]** ${c.mpn} (${c.category}) - 库存: **${c.stock}** - 仓位: ${c.location_text || '-'}`).join('\n');
     const totalStock = components.reduce((sum, c) => sum + (Number(c.stock) || 0), 0);
@@ -276,14 +297,18 @@ async function syncAllComponents(components = []) {
             text: { tag: 'lark_md', content: `**物料清单预览 (前 10 项):**\n${topComps}\n*(更多请在小程序物料库中查看)*` }
           }
         ]
-      }
+      },
+      event: 'BATCH_FULL_SYNC',
+      sync_time: nowStr,
+      total_types: components.length,
+      items: formattedItems
     };
 
     return sendHttpRequest({
       url: config.webhookUrl,
       method: 'POST',
       data: summaryCard,
-      timeout: 12000
+      timeout: 15000
     });
   }
 
@@ -294,7 +319,7 @@ async function syncAllComponents(components = []) {
       event: 'BATCH_FULL_SYNC',
       sync_time: nowStr,
       total_types: components.length,
-      items: components
+      items: formattedItems
     },
     timeout: 15000
   });
