@@ -201,3 +201,66 @@
   color: #262626;
   font-weight: 500;
 }
+
+/* Online Spreadsheet Sync Box */
+.online-sync-config {
+  background: #fcfdfe;
+  border: 1px solid #dbeafe;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  margin-top: 16rpx;
+}
+
+.sync-input-row {
+  margin-bottom: 16rpx;
+}
+
+.sync-input-label {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 8rpx;
+}
+
+.sync-input {
+  background: #ffffff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10rpx;
+  padding: 12rpx 16rpx;
+  font-size: 24rpx;
+  color: #1e293b;
+}
+
+.sync-btn-group {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.sync-btn-group .flex-btn {
+  flex: 1;
+  font-size: 24rpx;
+  padding: 14rpx 0;
+  border-radius: 30rpx;
+  margin: 0;
+}
+
+.sync-guide-box {
+  background: #eff6ff;
+  border-radius: 12rpx;
+  padding: 16rpx;
+}
+
+.sync-guide-title {
+  font-size: 22rpx;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 8rpx;
+}
+
+.sync-guide-step {
+  font-size: 20rpx;
+  color: #3b82f6;
+  line-height: 1.5;
+}
+

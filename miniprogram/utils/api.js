@@ -6,6 +6,7 @@
 
 const qrParser = require('./qrParser');
 const { classifyComponent, decodeResistorSpec, decodeCapacitorSpec } = require('./classifier');
+const onlineSync = require('./onlineSync');
 
 function getEngineMode() {
   return wx.getStorageSync('ENGINE_MODE') || 'local';
@@ -667,7 +668,15 @@ const api = {
 
     if (mode === 'rest') {
       try {
-        return await restRequest('/components', 'POST', item);
+        const res = await restRequest('/components', 'POST', item);
+        onlineSync.syncStockEvent({
+          event: 'CREATE',
+          component: item,
+          changeQty: item.stock,
+          balanceQty: item.stock,
+          remark: '录入新物料'
+        }).catch(() => {});
+        return res;
       } catch (e) {}
     }
 
@@ -698,6 +707,15 @@ const api = {
       LocalStorage._set('LOCAL_LOGS', logs);
     }
 
+    // Trigger Real-time Online Sheet Sync
+    onlineSync.syncStockEvent({
+      event: 'CREATE',
+      component: item,
+      changeQty: item.stock,
+      balanceQty: item.stock,
+      remark: '录入新物料'
+    }).catch(() => {});
+
     return { success: true, data: item };
   },
 
@@ -708,13 +726,35 @@ const api = {
 
     if (mode === 'rest') {
       try {
-        return await restRequest(`/components/${id}`, 'PUT', data);
+        const res = await restRequest(`/components/${id}`, 'PUT', data);
+        onlineSync.syncStockEvent({
+          event: 'UPDATE',
+          component: { id, ...data },
+          remark: '修改物料信息'
+        }).catch(() => {});
+        return res;
       } catch (e) {}
     }
 
     let comps = LocalStorage._get('LOCAL_COMPS', []);
-    comps = comps.map(c => (String(c.id) === String(id) || String(c._id) === String(id)) ? { ...c, ...data, updated_at: now } : c);
+    let updatedItem = null;
+    comps = comps.map(c => {
+      if (String(c.id) === String(id) || String(c._id) === String(id)) {
+        updatedItem = { ...c, ...data, updated_at: now };
+        return updatedItem;
+      }
+      return c;
+    });
     LocalStorage._set('LOCAL_COMPS', comps);
+
+    if (updatedItem) {
+      onlineSync.syncStockEvent({
+        event: 'UPDATE',
+        component: updatedItem,
+        remark: '修改物料信息'
+      }).catch(() => {});
+    }
+
     return { success: true, msg: '修改成功' };
   },
 
@@ -948,17 +988,21 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
+    // Trigger Real-time Online Sheet Sync
+    onlineSync.syncStockEvent({
+      event: 'STOCK_IN',
+      component: comp,
+      changeQty: addQty,
+      balanceQty: newStock,
+      orderNo: order_no || comp.order_no || '',
+      remark
+    }).catch(() => {});
+
     return { success: true, msg: `入库成功，当前库存：${newStock}` };
   },
 
   async stockOut(data) {
     const mode = getEngineMode();
-    if (mode === 'rest') {
-      try {
-        return await restRequest('/stock/out', 'POST', data);
-      } catch (e) {}
-    }
-
     const { component_id, qty, remark = '项目领料' } = data;
     const outQty = Number(qty);
     const detail = await this.getComponentDetail(component_id);
@@ -968,6 +1012,20 @@ const api = {
     }
     const newStock = Number(comp.stock) - outQty;
     const now = new Date().toLocaleDateString();
+
+    if (mode === 'rest') {
+      try {
+        const res = await restRequest('/stock/out', 'POST', data);
+        onlineSync.syncStockEvent({
+          event: 'STOCK_OUT',
+          component: comp,
+          changeQty: -outQty,
+          balanceQty: newStock,
+          remark
+        }).catch(() => {});
+        return res;
+      } catch (e) {}
+    }
 
     let comps = LocalStorage._get('LOCAL_COMPS', []);
     comps = comps.map(c => (String(c.id) === String(component_id) || String(c._id) === String(component_id)) ? { ...c, stock: newStock, updated_at: now } : c);
@@ -987,23 +1045,40 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
+    // Trigger Real-time Online Sheet Sync
+    onlineSync.syncStockEvent({
+      event: 'STOCK_OUT',
+      component: comp,
+      changeQty: -outQty,
+      balanceQty: newStock,
+      remark
+    }).catch(() => {});
+
     return { success: true, msg: `领料成功，剩余库存：${newStock}` };
   },
 
   async stockSet(data) {
     const mode = getEngineMode();
-    if (mode === 'rest') {
-      try {
-        return await restRequest('/stock/adjust', 'POST', data);
-      } catch (e) {}
-    }
-
     const { component_id, stock, remark = '盘点校准' } = data;
     const newStock = Number(stock);
     const detail = await this.getComponentDetail(component_id);
     const comp = detail.data;
     const diff = newStock - Number(comp.stock);
     const now = new Date().toLocaleDateString();
+
+    if (mode === 'rest') {
+      try {
+        const res = await restRequest('/stock/adjust', 'POST', data);
+        onlineSync.syncStockEvent({
+          event: 'STOCK_ADJUST',
+          component: comp,
+          changeQty: diff,
+          balanceQty: newStock,
+          remark
+        }).catch(() => {});
+        return res;
+      } catch (e) {}
+    }
 
     let comps = LocalStorage._get('LOCAL_COMPS', []);
     comps = comps.map(c => (String(c.id) === String(component_id) || String(c._id) === String(component_id)) ? { ...c, stock: newStock, updated_at: now } : c);
@@ -1023,6 +1098,15 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
+    // Trigger Real-time Online Sheet Sync
+    onlineSync.syncStockEvent({
+      event: 'STOCK_ADJUST',
+      component: comp,
+      changeQty: diff,
+      balanceQty: newStock,
+      remark
+    }).catch(() => {});
+
     return { success: true, msg: `校准成功，当前库存：${newStock}` };
   },
 
@@ -1041,7 +1125,9 @@ const api = {
         { id: 3, name: '大号抽屉标签 (50x30mm)', width_mm: 50, height_mm: 30, is_default: 0 }
       ])
     };
-  }
+  },
+
+  onlineSync
 };
 
 module.exports = api;

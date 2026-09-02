@@ -1,5 +1,6 @@
 // pages/settings/settings.js
 const api = require('../../utils/api');
+const onlineSync = require('../../utils/onlineSync');
 
 Page({
   data: {
@@ -7,13 +8,22 @@ Page({
     serverUrl: 'http://127.0.0.1:3000',
     testingServer: false,
     seeding: false,
-    savedBle: null
+    savedBle: null,
+
+    // Online Sync
+    syncEnabled: false,
+    webhookUrl: '',
+    testingSync: false,
+    pushingAll: false
   },
 
   onShow() {
+    const syncCfg = onlineSync.getSyncConfig();
     this.setData({
       engineMode: api.getEngineMode(),
-      serverUrl: api.getServerUrl()
+      serverUrl: api.getServerUrl(),
+      syncEnabled: syncCfg.enabled,
+      webhookUrl: syncCfg.webhookUrl
     });
     this.loadSavedBle();
   },
@@ -53,6 +63,95 @@ Page({
       wx.showModal({
         title: '连接失败',
         content: `无法连接到 ${cleanUrl}\n\n请检查：\n1. 电脑是否双击运行了【启动后端服务.bat】？\n2. 手机和电脑是否连接在同一个 WiFi 局域网下？\n3. 填写的 IP 是否是电脑的局域网 IP（如 192.168.x.x）？`,
+        showCancel: false
+      });
+    }
+  },
+
+  // Online Sync Handlers
+  onSyncSwitchChange(e) {
+    const enabled = e.detail.value;
+    onlineSync.saveSyncConfig({ enabled });
+    this.setData({ syncEnabled: enabled });
+    wx.showToast({
+      title: enabled ? '已开启在线表格同步' : '已关闭在线表格同步',
+      icon: 'none'
+    });
+  },
+
+  onWebhookUrlInput(e) {
+    const url = e.detail.value;
+    onlineSync.saveSyncConfig({ webhookUrl: url });
+    this.setData({ webhookUrl: url });
+  },
+
+  async testSyncConnection() {
+    const url = this.data.webhookUrl.trim();
+    if (!url) {
+      wx.showToast({ title: '请先输入 Webhook 链接', icon: 'none' });
+      return;
+    }
+    onlineSync.saveSyncConfig({ webhookUrl: url });
+
+    this.setData({ testingSync: true });
+    wx.showLoading({ title: '发送测试请求...' });
+
+    try {
+      await onlineSync.testWebhookConnection(url);
+      wx.hideLoading();
+      this.setData({ testingSync: false });
+      wx.showModal({
+        title: '🎉 连通测试成功！',
+        content: '在线表格 / 飞书机器人已成功接收到测试数据！\n\n后续每次元器件录入、领料出库都会自动实时同步到该表格。',
+        showCancel: false
+      });
+    } catch (err) {
+      wx.hideLoading();
+      this.setData({ testingSync: false });
+      wx.showModal({
+        title: '测试推送失败',
+        content: err.message || '请检查 Webhook 链接是否正确，或网络是否通畅',
+        showCancel: false
+      });
+    }
+  },
+
+  async pushAllToOnlineSheet() {
+    const url = this.data.webhookUrl.trim();
+    if (!url) {
+      wx.showToast({ title: '请先输入 Webhook 链接', icon: 'none' });
+      return;
+    }
+    onlineSync.saveSyncConfig({ webhookUrl: url, enabled: true });
+    this.setData({ syncEnabled: true, pushingAll: true });
+
+    wx.showLoading({ title: '读取库中全部物料...' });
+    try {
+      const res = await api.getComponents();
+      const list = (res.data && res.data.list) || [];
+      if (list.length === 0) {
+        wx.hideLoading();
+        this.setData({ pushingAll: false });
+        wx.showToast({ title: '库中暂无元器件物料', icon: 'none' });
+        return;
+      }
+
+      wx.showLoading({ title: `正在推送 ${list.length} 种物料...` });
+      await onlineSync.syncAllComponents(list);
+
+      wx.hideLoading();
+      this.setData({ pushingAll: false });
+      wx.showModal({
+        title: '✅ 全量同步成功！',
+        content: `已成功将库中现有的 ${list.length} 种元器件完整推送到在线表格！`,
+        showCancel: false
+      });
+    } catch (err) {
+      wx.hideLoading();
+      this.setData({ pushingAll: false });
+      wx.showModal({
+        title: '同步失败',
+        content: err.message || '网络连接超时',
         showCancel: false
       });
     }
