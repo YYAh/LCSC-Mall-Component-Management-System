@@ -42,6 +42,7 @@ app.use('/api/components', require('./routes/components'));
 app.use('/api/books', require('./routes/books'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/templates', require('./routes/templates'));
+app.use('/api/sync', require('./routes/sync'));
 
 // Get local network IPs for convenient phone connection
 function getLocalIpAddresses() {
