@@ -16,7 +16,7 @@ function getSyncConfig() {
   return {
     enabled: wx.getStorageSync(STORAGE_KEYS.ENABLED) === true || wx.getStorageSync(STORAGE_KEYS.ENABLED) === 'true',
     type: wx.getStorageSync(STORAGE_KEYS.TYPE) || 'webhook',
-    webhookUrl: wx.getStorageSync(STORAGE_KEYS.WEBHOOK_URL) || '',
+    webhookUrl: wx.getStorageSync(STORAGE_KEYS.WEBHOOK_URL) || 'https://open.feishu.cn/open-apis/bot/v2/hook/f4459919-ec87-4db0-b86f-3f2e9a139f01',
     feishuAppToken: wx.getStorageSync(STORAGE_KEYS.FEISHU_APP_TOKEN) || '',
     feishuTableId: wx.getStorageSync(STORAGE_KEYS.FEISHU_TABLE_ID) || '',
     feishuAuthToken: wx.getStorageSync(STORAGE_KEYS.FEISHU_AUTH_TOKEN) || ''
