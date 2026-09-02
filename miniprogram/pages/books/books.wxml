@@ -1,0 +1,97 @@
+<!-- pages/books/books.wxml -->
+<view class="container">
+  <!-- Book Header & Selector -->
+  <view class="card book-header-card">
+    <view class="book-select-row">
+      <picker range="{{books}}" range-key="name" value="{{currentBookIndex}}" bindchange="onBookChange">
+        <view class="book-picker">
+          <text class="book-name-title">{{currentBook.name || '选择样品册'}}</text>
+          <text class="picker-arrow">▼ 切换</text>
+        </view>
+      </picker>
+
+      <view class="book-action-btns">
+        <button class="add-book-btn" bindtap="openAddBookModal">+ 新建册</button>
+        <button class="del-book-btn" bindtap="confirmDeleteBook" wx:if="{{books.length > 1}}">🗑️ 删除此册</button>
+      </view>
+    </view>
+
+    <!-- Utilization Progress -->
+    <view class="book-metrics" wx:if="{{currentBook}}">
+      <view class="metric-item">
+        <text class="metric-val">{{currentBook.code}}</text>
+        <text class="metric-lbl">册编号</text>
+      </view>
+      <view class="metric-item">
+        <text class="metric-val">{{currentBook.total_pages || 20}} 页</text>
+        <text class="metric-lbl">总容量</text>
+      </view>
+      <view class="metric-item">
+        <text class="metric-val text-green">{{currentBook.used_slots || 0}} / {{currentBook.total_slots || 240}}</text>
+        <text class="metric-lbl">已用插槽 (行)</text>
+      </view>
+      <view class="metric-item">
+        <text class="metric-val text-blue">{{currentBook.empty_slots || 0}}</text>
+        <text class="metric-lbl">空余插槽</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Page Navigator -->
+  <view class="page-navigator card">
+    <button class="nav-arrow-btn" bindtap="prevPage" disabled="{{currentPage <= 1}}">&lt; 上一页</button>
+    
+    <picker range="{{pageList}}" value="{{currentPage - 1}}" bindchange="onPageJump">
+      <view class="page-current-tag">
+        <text class="page-badge">第 P{{currentPage < 10 ? '0' + currentPage : currentPage}} 页</text>
+        <text class="page-sub">共 {{currentBook.total_pages || 20}} 页 (点击跳转)</text>
+      </view>
+    </picker>
+
+    <button class="nav-arrow-btn" bindtap="nextPage" disabled="{{currentPage >= (currentBook.total_pages || 20)}}">下一页 &gt;</button>
+  </view>
+
+  <!-- 12-Row Visual Sample Book Page Grid -->
+  <view class="sample-book-page">
+    <view class="page-title-banner">
+      <text>📖 {{currentBook.name}} - 第 {{currentPage}} 页 (12 行插槽视图)</text>
+    </view>
+
+    <view class="slots-container">
+      <block wx:for="{{slots}}" wx:key="row_no">
+        <!-- Row Item: Occupied -->
+        <view class="slot-row occupied" wx:if="{{!item.is_empty}}" bindtap="viewComponentDetail" data-id="{{item.component.id || item.component._id}}">
+          <view class="row-index-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
+          
+          <image class="row-thumb" src="{{item.component.image_url}}" mode="aspectFit" wx:if="{{item.component.image_url && item.component.image_url.length > 5}}" />
+          
+          <view class="row-info">
+            <view class="row-top-line">
+              <text class="badge-category-mini">{{item.component.category}}</text>
+              <text class="badge-c-code" wx:if="{{item.component.c_code}}">{{item.component.c_code}}</text>
+              <text class="row-name">{{item.component.mpn || item.component.name}}</text>
+            </view>
+            <view class="row-sub-line">
+              <text class="row-spec">{{item.component.spec || item.component.name}}</text>
+              <text class="row-pkg" wx:if="{{item.component.package_name}}"> | {{item.component.package_name}}</text>
+            </view>
+          </view>
+
+          <view class="row-stock-box">
+            <text class="row-stock-num">{{item.component.stock}}</text>
+            <text class="row-stock-unit">{{item.component.unit || '个'}}</text>
+          </view>
+        </view>
+
+        <!-- Row Item: Empty Slot -->
+        <view class="slot-row empty" wx:else bindtap="fillEmptySlot" data-row="{{item.row_no}}">
+          <view class="row-index-badge empty-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
+          <view class="empty-slot-content">
+            <text class="empty-plus">+</text>
+            <text class="empty-slot-text">第 {{item.row_no}} 行空闲插槽 · 点击扫码放入元件</text>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

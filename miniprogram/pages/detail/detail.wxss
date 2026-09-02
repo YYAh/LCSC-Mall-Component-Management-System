@@ -1,0 +1,388 @@
+/* pages/detail/detail.wxss */
+.comp-detail-card {
+  padding: 28rpx;
+}
+
+.detail-top-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding-bottom: 24rpx;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 24rpx;
+}
+
+.detail-header-left {
+  display: flex;
+  gap: 20rpx;
+  flex: 1;
+}
+
+.detail-img {
+  width: 120rpx;
+  height: 120rpx;
+  background: #f8fafc;
+  border-radius: 12rpx;
+  border: 1px solid #f0f0f0;
+}
+
+.detail-title-group {
+  flex: 1;
+}
+
+.no-img-title-group {
+  padding: 4rpx 0;
+}
+
+.detail-mpn-title {
+  font-size: 34rpx;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.3;
+}
+
+.mpn-title-prominent {
+  font-size: 40rpx;
+  font-weight: 800;
+  color: #1a1a1a;
+  line-height: 1.3;
+  margin-bottom: 8rpx;
+}
+
+.badge-row {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 10rpx;
+}
+
+.edit-pill-btn {
+  background: #e6f7ff;
+  color: #1890ff;
+  font-size: 24rpx;
+  padding: 8rpx 20rpx;
+  border-radius: 30rpx;
+  border: 1px solid #91d5ff;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Spec List (Matching Image 3) */
+.spec-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.spec-row {
+  display: flex;
+  padding: 22rpx 0;
+  border-bottom: 1px solid #f5f5f5;
+  align-items: center;
+}
+
+.spec-row:last-child {
+  border-bottom: none;
+}
+
+.spec-label {
+  width: 150rpx;
+  font-size: 28rpx;
+  color: #8c8c8c;
+  letter-spacing: 2rpx;
+}
+
+.spec-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #262626;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.font-brand {
+  color: #2f54eb;
+  font-weight: 600;
+}
+
+.stock-highlight {
+  display: flex;
+  align-items: baseline;
+}
+
+.stock-num-lg {
+  font-size: 38rpx;
+  font-weight: 800;
+}
+
+.safe-stock-tip {
+  font-size: 22rpx;
+  color: #bfbfbf;
+  margin-left: 12rpx;
+}
+
+.c-code-link {
+  color: #1890ff;
+  font-weight: 600;
+}
+
+.spec-value-text {
+  color: #262626;
+  font-weight: 500;
+}
+
+.pkg-badge {
+  color: #722ed1;
+  font-weight: 600;
+}
+
+.location-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.badge-location-bold {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  font-weight: 700;
+  font-size: 26rpx;
+}
+
+.view-slot-arrow {
+  font-size: 22rpx;
+  color: #1890ff;
+}
+
+.text-muted {
+  color: #8c8c8c;
+}
+
+.text-blue { color: #1890ff; }
+.text-red { color: #f5222d; }
+
+/* Stock Action Grid (Fixed buttons) */
+.stock-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.stock-op-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 12rpx;
+  border-radius: 16rpx;
+  margin: 0;
+  gap: 10rpx;
+}
+
+.op-out {
+  background: #fff1f0;
+  border: 1px solid #ffa39e;
+  color: #f5222d;
+}
+
+.op-in {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #52c41a;
+}
+
+.op-set {
+  background: #e6f7ff;
+  border: 1px solid #91d5ff;
+  color: #1890ff;
+}
+
+.op-icon {
+  font-size: 36rpx;
+  font-weight: 800;
+}
+
+.op-text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.op-title {
+  font-size: 26rpx;
+  font-weight: 700;
+}
+
+.op-sub {
+  font-size: 18rpx;
+  opacity: 0.8;
+}
+
+/* Datasheet Card */
+.datasheet-card {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+}
+
+.ds-icon {
+  font-size: 40rpx;
+}
+
+.ds-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.ds-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1d39c4;
+}
+
+.ds-url {
+  font-size: 20rpx;
+  color: #597ef7;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 4rpx;
+}
+
+.ds-copy-btn {
+  font-size: 22rpx;
+  color: #1890ff;
+  background: #ffffff;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  white-space: nowrap;
+}
+
+/* Timeline */
+.timeline-item {
+  display: flex;
+  position: relative;
+  padding-bottom: 24rpx;
+}
+
+.timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.timeline-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  margin-top: 10rpx;
+  margin-right: 16rpx;
+}
+
+.dot-in { background: #52c41a; }
+.dot-out { background: #f5222d; }
+.dot-adjust { background: #1890ff; }
+
+.timeline-content { flex: 1; }
+.timeline-top { display: flex; justify-content: space-between; font-size: 26rpx; font-weight: 600; }
+.timeline-qty { font-size: 28rpx; }
+.timeline-sub { font-size: 22rpx; color: #8c8c8c; margin-top: 4rpx; }
+
+/* Bottom Bar */
+.detail-bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  padding: 20rpx 32rpx;
+  display: flex;
+  gap: 20rpx;
+  box-shadow: 0 -4rpx 16rpx rgba(0, 0, 0, 0.06);
+  z-index: 99;
+}
+
+.bottom-btn { flex: 1; }
+.btn-danger-outline {
+  background: #ffffff;
+  color: #f5222d;
+  border: 1px solid #ffa39e;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+}
+
+/* Edit Modal */
+.edit-modal-mask {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 30rpx;
+}
+
+.edit-modal-content {
+  background: #ffffff;
+  border-radius: 24rpx;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  padding: 32rpx;
+}
+
+.edit-modal-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  margin-bottom: 24rpx;
+  padding-bottom: 16rpx;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.close-modal-x {
+  font-size: 36rpx;
+  color: #8c8c8c;
+  padding: 8rpx;
+}
+
+.edit-form-scroll {
+  max-height: 55vh;
+}
+
+.edit-form-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.edit-label {
+  width: 140rpx;
+  font-size: 28rpx;
+  color: #595959;
+}
+
+.edit-input {
+  flex: 1;
+  font-size: 28rpx;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10rpx;
+  padding: 12rpx 16rpx;
+}
+
+.edit-modal-footer {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+  padding-top: 16rpx;
+  border-top: 1px solid #f0f0f0;
+}

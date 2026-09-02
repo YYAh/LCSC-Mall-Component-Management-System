@@ -1,0 +1,124 @@
+<!-- pages/index/index.wxml -->
+<view class="container">
+  <!-- Header Card -->
+  <view class="header-card">
+    <view class="header-top">
+      <view>
+        <view class="header-title">元器件仓库看板</view>
+        <view class="header-sub">样品册 12 行精准定位 · 多端同步</view>
+      </view>
+      <view class="server-status {{isConnected ? 'online' : 'offline'}}" bindtap="goToSettings">
+        <text class="status-dot"></text>
+        <text>{{isConnected ? '服务已连接' : '未连接服务'}}</text>
+      </view>
+    </view>
+
+    <!-- KPI Grid -->
+    <view class="kpi-grid">
+      <view class="kpi-item" bindtap="goToComponents">
+        <view class="kpi-num">{{stats.total_components || 0}}</view>
+        <view class="kpi-label">物料种类 (种)</view>
+      </view>
+      <view class="kpi-item" bindtap="goToComponents">
+        <view class="kpi-num">{{stats.total_stock || 0}}</view>
+        <view class="kpi-label">总库存数 (PCS)</view>
+      </view>
+      <view class="kpi-item {{stats.low_stock_count > 0 ? 'warning' : ''}}" bindtap="goToLowStock">
+        <view class="kpi-num">{{stats.low_stock_count || 0}}</view>
+        <view class="kpi-label">低库存预警</view>
+      </view>
+      <view class="kpi-item" bindtap="goToBooks">
+        <view class="kpi-num">{{stats.total_books || 0}}</view>
+        <view class="kpi-label">样品册 (本)</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Quick Action Buttons -->
+  <view class="action-grid">
+    <view class="action-btn scan-btn" bindtap="quickScan">
+      <view class="action-icon">📷</view>
+      <view class="action-text">
+        <view class="action-title">扫码录入</view>
+        <view class="action-desc">扫嘉立创包装袋二维码</view>
+      </view>
+    </view>
+
+    <view class="action-btn book-btn" bindtap="goToBooks">
+      <view class="action-icon">📖</view>
+      <view class="action-text">
+        <view class="action-title">样品册管理</view>
+        <view class="action-desc">每页 12 行插槽可视化</view>
+      </view>
+    </view>
+
+    <view class="action-btn search-btn" bindtap="goToComponents">
+      <view class="action-icon">🔍</view>
+      <view class="action-text">
+        <view class="action-title">查找元件</view>
+        <view class="action-desc">按 C编号/型号/参数搜索</view>
+      </view>
+    </view>
+
+    <view class="action-btn print-btn" bindtap="goToPrint">
+      <view class="action-icon">🖨️</view>
+      <view class="action-text">
+        <view class="action-title">标签打印</view>
+        <view class="action-desc">蓝牙便携打印专属标签</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Low Stock Alert -->
+  <view class="card" wx:if="{{stats.low_stock_list && stats.low_stock_list.length > 0}}">
+    <view class="card-title">
+      <text style="color: #f5222d;">⚠️ 缺料预警 ({{stats.low_stock_list.length}})</text>
+      <text class="more-link" bindtap="goToLowStock">查看全部 &gt;</text>
+    </view>
+    <view class="low-stock-list">
+      <view class="low-stock-item" wx:for="{{stats.low_stock_list}}" wx:key="id" bindtap="goToDetail" data-id="{{item.id}}">
+        <view class="low-stock-info">
+          <view class="low-stock-name">
+            <text class="badge-c-code" wx:if="{{item.c_code}}">{{item.c_code}}</text>
+            <text class="name-text">{{item.name}}</text>
+          </view>
+          <view class="low-stock-loc">{{item.location_text || '未分配仓位'}} · {{item.package_name || item.brand || ''}}</view>
+        </view>
+        <view class="low-stock-num">
+          <text class="current-stock">{{item.stock}}</text>
+          <text class="safe-stock">/ 安全值 {{item.safe_stock}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Recent In/Out Logs -->
+  <view class="card">
+    <view class="card-title">
+      <text>📋 最近出入库动态</text>
+    </view>
+    <view class="log-list" wx:if="{{stats.recent_logs && stats.recent_logs.length > 0}}">
+      <view class="log-item" wx:for="{{stats.recent_logs}}" wx:key="id">
+        <view class="log-tag {{item.type === 'IN' ? 'in' : (item.type === 'OUT' ? 'out' : 'adjust')}}">
+          {{item.type === 'IN' ? '入库' : (item.type === 'OUT' ? '出库' : '盘点')}}
+        </view>
+        <view class="log-content">
+          <view class="log-title">
+            <text class="log-comp-name">{{item.name || item.mpn}}</text>
+            <text class="log-qty {{item.type === 'IN' ? 'text-green' : 'text-red'}}">
+              {{item.type === 'IN' ? '+' : (item.type === 'OUT' ? '' : '校准至')}}{{item.change_qty}}
+            </text>
+          </view>
+          <view class="log-sub">
+            <text>{{item.location_text || '无仓位'}}</text>
+            <text wx:if="{{item.remark}}"> · {{item.remark}}</text>
+            <text class="log-time">{{item.created_at}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="empty-box" wx:else>
+      <text class="empty-text">暂无出入库记录</text>
+    </view>
+  </view>
+</view>

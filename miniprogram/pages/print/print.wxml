@@ -1,0 +1,88 @@
+<!-- pages/print/print.wxml -->
+<view class="container">
+  <!-- Template Selector (Dynamically loaded via api.getTemplates) -->
+  <view class="card">
+    <view class="card-title">
+      <text>📐 选择标签尺寸模板</text>
+      <text class="dpi-tag">动态模板库</text>
+    </view>
+    <view class="template-grid">
+      <view class="template-item {{selectedTplIndex === index ? 'active' : ''}}" wx:for="{{templates}}" wx:key="name" bindtap="onTplChange" data-value="{{index}}">
+        <view class="tpl-name">{{item.name}}</view>
+        <view class="tpl-size">{{item.width_mm}} × {{item.height_mm}} mm</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Live Label Preview (Canvas) -->
+  <view class="card preview-card">
+    <view class="card-title">
+      <text>👁️ 标签效果实时预览</text>
+      <text class="dpi-tag">203 DPI 矢量排版</text>
+    </view>
+    
+    <view class="canvas-wrapper">
+      <canvas canvas-id="labelCanvas" class="label-canvas" style="width: {{canvasWidth}}px; height: {{canvasHeight}}px;"></canvas>
+    </view>
+
+    <view class="label-info-desc">
+      <text>包含专属二维码 + 仓位编码【{{comp.location_text || 'B01-P01-R01'}}】+ 嘉立创编号</text>
+    </view>
+  </view>
+
+  <!-- Bluetooth BLE Printer Manager -->
+  <view class="card">
+    <view class="card-title">
+      <text>🖨️ 蓝牙热敏标签机连接</text>
+      <view class="ble-status-tag {{isBleConnected ? 'connected' : 'disconnected'}}">
+        {{isBleConnected ? '● 已连接: ' + bleDeviceName : '○ 未连接打印机'}}
+      </view>
+    </view>
+
+    <view class="ble-controls">
+      <button class="btn-secondary ble-search-btn" bindtap="startSearchBle" loading="{{searchingBle}}">
+        {{searchingBle ? '正在搜索蓝牙设备...' : '🔍 搜索并连接蓝牙打印机'}}
+      </button>
+
+      <!-- Discovered device list -->
+      <view class="device-list" wx:if="{{deviceList.length > 0}}">
+        <view class="device-item" wx:for="{{deviceList}}" wx:key="deviceId" bindtap="connectDevice" data-item="{{item}}">
+          <view class="device-info">
+            <text class="device-name">{{item.name}}</text>
+            <text class="device-id">{{item.deviceId}}</text>
+          </view>
+          <text class="connect-action-text">点击连接</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Print Protocol & Setting -->
+  <view class="card">
+    <view class="card-title">
+      <text>⚙️ 打印机协议与份数</text>
+    </view>
+    
+    <view class="setting-row">
+      <text class="setting-label">指令集协议</text>
+      <picker range="{{protocols}}" value="{{selectedProtoIndex}}" bindchange="onProtoChange">
+        <view class="proto-picker-box">
+          <text>{{protocols[selectedProtoIndex]}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="copies-bar" style="margin-top: 16rpx;">
+      <text class="setting-label">打印份数</text>
+      <input class="copies-input" type="number" value="{{copies}}" bindinput="onCopiesChange" />
+      <text style="font-size: 26rpx; color: #8c8c8c; margin-left: 10rpx;">份</text>
+    </view>
+  </view>
+
+  <view class="action-footer">
+    <button class="btn-primary main-print-btn" bindtap="onPrint" loading="{{printing}}">
+      🖨️ 发送蓝牙打印
+    </button>
+  </view>
+</view>

@@ -1,0 +1,211 @@
+<!-- pages/detail/detail.wxml -->
+<view class="container" wx:if="{{comp}}">
+  <!-- Main Info Card (Matching Image 3 & Image 2) -->
+  <view class="card comp-detail-card">
+    <view class="detail-top-banner">
+      <view class="detail-header-left">
+        <!-- Render image ONLY if real image exists -->
+        <image class="detail-img" src="{{comp.image_url}}" mode="aspectFit" bindtap="previewImage" wx:if="{{comp.image_url && comp.image_url.length > 5}}" />
+        <view class="detail-title-group {{(!comp.image_url || comp.image_url.length <= 5) ? 'no-img-title-group' : ''}}">
+          <view class="detail-mpn-title {{(!comp.image_url || comp.image_url.length <= 5) ? 'mpn-title-prominent' : ''}}">
+            {{comp.mpn}}
+          </view>
+          <view class="badge-row">
+            <text class="badge-category">{{comp.category || '贴片器件'}}</text>
+            <text class="badge-c-code" wx:if="{{comp.c_code}}">{{comp.c_code}}</text>
+          </view>
+        </view>
+      </view>
+      <button class="edit-pill-btn" bindtap="openEditModal">✏️ 修改信息</button>
+    </view>
+
+    <!-- Comprehensive Specification Field List -->
+    <view class="spec-list">
+      <view class="spec-row">
+        <text class="spec-label">型　号</text>
+        <text class="spec-value font-bold c-code-link" bindtap="copyMpn">{{comp.mpn}} 📋</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">数　量</text>
+        <view class="spec-value stock-highlight">
+          <text class="stock-num-lg {{comp.stock <= comp.safe_stock ? 'text-red' : 'text-blue'}}">{{comp.stock}}</text>
+          <text class="stock-unit"> {{comp.unit || '个'}}</text>
+          <text class="safe-stock-tip">(安全预警: {{comp.safe_stock}})</text>
+        </view>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">编　号</text>
+        <text class="spec-value c-code-link" bindtap="copyCCode">{{comp.c_code || '无'}} 📋</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">品　牌</text>
+        <text class="spec-value font-brand">{{comp.brand || '国产优质/通用'}}</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">参数值</text>
+        <text class="spec-value spec-value-text">{{comp.spec || comp.name || '-'}}</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">封　装</text>
+        <text class="spec-value pkg-badge">{{comp.package_name || '通用封装'}}</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">分　类</text>
+        <text class="spec-value">{{comp.category || '常用电子器件'}}</text>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">仓　位</text>
+        <view class="spec-value location-nav-link" bindtap="viewInBook">
+          <text class="badge-location-bold">{{comp.location_text || '未分配仓位'}}</text>
+          <text class="view-slot-arrow">查看样品册 &gt;</text>
+        </view>
+      </view>
+
+      <view class="spec-row">
+        <text class="spec-label">备　注</text>
+        <text class="spec-value text-muted">{{comp.order_no ? '订单: ' + comp.order_no : '无'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- Stock Actions Card (Optimized wide buttons) -->
+  <view class="card">
+    <view class="card-title">
+      <text>⚡ 快速出入库操作</text>
+    </view>
+
+    <view class="stock-action-grid">
+      <button class="stock-op-btn op-out" bindtap="openOutboundModal">
+        <text class="op-icon">-</text>
+        <view class="op-text-group">
+          <text class="op-title">领料出库</text>
+          <text class="op-sub">输入领料数量</text>
+        </view>
+      </button>
+
+      <button class="stock-op-btn op-in" bindtap="openInboundModal">
+        <text class="op-icon">+</text>
+        <view class="op-text-group">
+          <text class="op-title">补充入库</text>
+          <text class="op-sub">增加库存数量</text>
+        </view>
+      </button>
+
+      <button class="stock-op-btn op-set" bindtap="openAdjustModal">
+        <text class="op-icon">⚙</text>
+        <view class="op-text-group">
+          <text class="op-title">盘点校准</text>
+          <text class="op-sub">修改实际库存</text>
+        </view>
+      </button>
+    </view>
+  </view>
+
+  <!-- Datasheet Link -->
+  <view class="card datasheet-card" wx:if="{{comp.datasheet_url}}" bindtap="openDatasheet">
+    <text class="ds-icon">📄</text>
+    <view class="ds-info">
+      <view class="ds-title">立创商城详情页与规格书</view>
+      <view class="ds-url">{{comp.datasheet_url}}</view>
+    </view>
+    <text class="ds-copy-btn">复制链接</text>
+  </view>
+
+  <!-- Stock Logs History -->
+  <view class="card">
+    <view class="card-title">
+      <text>📋 出入库流水记录</text>
+    </view>
+    <view class="log-timeline" wx:if="{{comp.logs && comp.logs.length > 0}}">
+      <view class="timeline-item" wx:for="{{comp.logs}}" wx:key="id">
+        <view class="timeline-dot {{item.type === 'IN' ? 'dot-in' : (item.type === 'OUT' ? 'dot-out' : 'dot-adjust')}}"></view>
+        <view class="timeline-content">
+          <view class="timeline-top">
+            <text class="timeline-type">{{item.type === 'IN' ? '入库' : (item.type === 'OUT' ? '出库领料' : '盘点校准')}}</text>
+            <text class="timeline-qty {{item.type === 'IN' ? 'text-green' : 'text-red'}}">
+              {{item.type === 'IN' ? '+' : ''}}{{item.change_qty}} {{comp.unit || '个'}}
+            </text>
+          </view>
+          <view class="timeline-sub">
+            <text>结存: {{item.balance_qty}}</text>
+            <text wx:if="{{item.remark}}"> · {{item.remark}}</text>
+            <text class="timeline-time">{{item.created_at}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="empty-box" wx:else>
+      <text class="empty-text">暂无出入库记录</text>
+    </view>
+  </view>
+
+  <!-- Fixed Bottom Bar -->
+  <view class="detail-bottom-bar">
+    <button class="bottom-btn btn-danger-outline" bindtap="deleteComponent">🗑️ 删除物料</button>
+    <button class="bottom-btn btn-primary" bindtap="goToPrint">🖨️ 打印专属标签</button>
+  </view>
+
+  <!-- Edit Component Modal (Matching Image 3) -->
+  <view class="edit-modal-mask" wx:if="{{showEditModal}}">
+    <view class="edit-modal-content">
+      <view class="edit-modal-title">
+        <text>修改物料信息</text>
+        <text class="close-modal-x" bindtap="closeEditModal">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="edit-form-scroll">
+        <view class="edit-form-row">
+          <text class="edit-label">型　号</text>
+          <input class="edit-input font-bold" value="{{editForm.mpn}}" bindinput="onEditInput" data-field="mpn" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">数　量</text>
+          <input class="edit-input" type="number" value="{{editForm.stock}}" bindinput="onEditInput" data-field="stock" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">编　号</text>
+          <input class="edit-input" value="{{editForm.c_code}}" bindinput="onEditInput" data-field="c_code" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">品　牌</text>
+          <input class="edit-input" value="{{editForm.brand}}" bindinput="onEditInput" data-field="brand" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">参数值</text>
+          <input class="edit-input" value="{{editForm.spec}}" bindinput="onEditInput" data-field="spec" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">封　装</text>
+          <input class="edit-input" value="{{editForm.package_name}}" bindinput="onEditInput" data-field="package_name" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">分　类</text>
+          <input class="edit-input" value="{{editForm.category}}" bindinput="onEditInput" data-field="category" />
+        </view>
+
+        <view class="edit-form-row">
+          <text class="edit-label">备　注</text>
+          <input class="edit-input" value="{{editForm.order_no}}" placeholder="例如订单号或用途" bindinput="onEditInput" data-field="order_no" />
+        </view>
+      </scroll-view>
+
+      <view class="edit-modal-footer">
+        <button class="btn-secondary" style="flex: 1;" bindtap="closeEditModal">取消</button>
+        <button class="btn-primary" style="flex: 2;" bindtap="submitEditForm" loading="{{savingEdit}}">保存修改</button>
+      </view>
+    </view>
+  </view>
+</view>

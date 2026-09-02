@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+miniprogram/miniprogram_npm/
+
+# Environment & Private Configs
+.env
+.DS_Store
+Thumbs.db
+*.log
+
+# SQLite local data (optional runtime database)
+backend/data/*.db
+!backend/data/.gitkeep
+
+# IDE & Editor
+.vscode/
+.idea/

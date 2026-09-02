@@ -1,0 +1,203 @@
+/* pages/settings/settings.wxss */
+.setting-desc {
+  font-size: 24rpx;
+  color: #8c8c8c;
+  line-height: 1.5;
+  margin-bottom: 20rpx;
+}
+
+.engine-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.engine-tab {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  transition: all 0.2s;
+}
+
+.engine-tab.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  box-shadow: 0 4rpx 16rpx rgba(24, 144, 255, 0.15);
+}
+
+.engine-title {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.engine-desc {
+  font-size: 22rpx;
+  color: #8c8c8c;
+  margin-top: 6rpx;
+}
+
+.cloud-actions {
+  margin-top: 20rpx;
+  padding-top: 20rpx;
+  border-top: 1px solid #f0f0f0;
+}
+
+.flex-btn {
+  width: 100%;
+}
+
+.rest-config-box {
+  background: #f0f5ff;
+  border: 1px solid #adc6ff;
+  border-radius: 14rpx;
+  padding: 18rpx 20rpx;
+  margin-top: 16rpx;
+}
+
+.rest-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1d39c4;
+  margin-bottom: 12rpx;
+}
+
+.rest-input-row {
+  display: flex;
+  gap: 12rpx;
+  align-items: center;
+}
+
+.rest-input {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 10rpx;
+  padding: 12rpx 16rpx;
+  font-size: 26rpx;
+}
+
+.rest-save-btn {
+  font-size: 24rpx;
+  padding: 12rpx 24rpx;
+  white-space: nowrap;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.rest-hint {
+  font-size: 22rpx;
+  color: #595959;
+  margin-top: 12rpx;
+  line-height: 1.4;
+}
+
+.cloud-tips {
+  font-size: 22rpx;
+  color: #fa8c16;
+  background: #fffbe6;
+  border: 1px solid #ffe58f;
+  border-radius: 10rpx;
+  padding: 14rpx 18rpx;
+  margin-top: 16rpx;
+  line-height: 1.4;
+}
+
+.free-features-box {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  border-radius: 14rpx;
+  padding: 18rpx 20rpx;
+  margin-top: 16rpx;
+}
+
+.free-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #389e0d;
+  margin-bottom: 10rpx;
+}
+
+.free-item {
+  font-size: 22rpx;
+  color: #237804;
+  line-height: 1.6;
+  margin-bottom: 6rpx;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.status-indicator {
+  font-size: 22rpx;
+  font-weight: normal;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+}
+
+.status-indicator.online {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.ble-saved-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 16rpx 20rpx;
+}
+
+.ble-saved-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #262626;
+}
+
+.ble-saved-id {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  margin-top: 4rpx;
+}
+
+.clear-ble-btn {
+  font-size: 22rpx;
+  padding: 8rpx 20rpx;
+  margin: 0;
+}
+
+.demo-btn {
+  width: 100%;
+  margin-top: 10rpx;
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 1px solid #91d5ff;
+}
+
+/* About Items */
+.about-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 26rpx;
+}
+
+.about-item:last-child {
+  border-bottom: none;
+}
+
+.about-label {
+  color: #8c8c8c;
+}
+
+.about-val {
+  color: #262626;
+  font-weight: 500;
+}

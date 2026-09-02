@@ -1,0 +1,273 @@
+/* pages/books/books.wxss */
+.book-header-card {
+  margin-bottom: 20rpx;
+}
+
+.book-select-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.book-picker {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.book-name-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.picker-arrow {
+  font-size: 24rpx;
+  color: #1890ff;
+}
+
+.book-action-btns {
+  display: flex;
+  gap: 12rpx;
+}
+
+.add-book-btn {
+  background: #e6f7ff;
+  color: #1890ff;
+  font-size: 22rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 20rpx;
+  margin: 0;
+  line-height: 1.4;
+  border: 1px solid #91d5ff;
+}
+
+.del-book-btn {
+  background: #fff1f0;
+  color: #f5222d;
+  font-size: 22rpx;
+  padding: 6rpx 18rpx;
+  border-radius: 20rpx;
+  margin: 0;
+  line-height: 1.4;
+  border: 1px solid #ffa39e;
+}
+
+.book-metrics {
+  display: flex;
+  justify-content: space-between;
+  background: #f8fafc;
+  border-radius: 12rpx;
+  padding: 16rpx 24rpx;
+  text-align: center;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.metric-val {
+  font-size: 28rpx;
+  font-weight: 700;
+}
+
+.metric-lbl {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  margin-top: 4rpx;
+}
+
+.text-green { color: #52c41a; }
+.text-blue { color: #1890ff; }
+
+/* Page Navigator */
+.page-navigator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.nav-arrow-btn {
+  background: #f0f2f5;
+  color: #262626;
+  font-size: 24rpx;
+  padding: 10rpx 24rpx;
+  border-radius: 30rpx;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.page-current-tag {
+  text-align: center;
+}
+
+.page-badge {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1890ff;
+  display: block;
+}
+
+.page-sub {
+  font-size: 20rpx;
+  color: #8c8c8c;
+}
+
+/* Sample Book Page (12 rows) */
+.sample-book-page {
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 20rpx 16rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+}
+
+.page-title-banner {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #595959;
+  padding: 0 10rpx 16rpx 10rpx;
+  border-bottom: 2px solid #f0f0f0;
+  margin-bottom: 12rpx;
+}
+
+.slots-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+}
+
+/* Slot Row */
+.slot-row {
+  display: flex;
+  align-items: center;
+  padding: 14rpx 16rpx;
+  border-radius: 10rpx;
+  transition: background-color 0.2s;
+}
+
+.slot-row.occupied {
+  background: #fcfdfe;
+  border: 1px solid #e8e8e8;
+}
+
+.slot-row.occupied:active {
+  background: #e6f7ff;
+}
+
+.slot-row.empty {
+  background: #fafafa;
+  border: 1px dashed #d9d9d9;
+}
+
+.slot-row.empty:active {
+  background: #f6ffed;
+  border-color: #52c41a;
+}
+
+.row-index-badge {
+  background: #1890ff;
+  color: #ffffff;
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 4rpx 10rpx;
+  border-radius: 6rpx;
+  margin-right: 14rpx;
+  min-width: 44rpx;
+  text-align: center;
+}
+
+.empty-badge {
+  background: #d9d9d9;
+  color: #595959;
+}
+
+.row-thumb {
+  width: 68rpx;
+  height: 68rpx;
+  background: #f0f2f5;
+  border-radius: 6rpx;
+  margin-right: 14rpx;
+}
+
+.row-info {
+  flex: 1;
+  overflow: hidden;
+}
+
+.row-top-line {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.badge-category-mini {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+  font-size: 18rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+  white-space: nowrap;
+}
+
+.row-name {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-sub-line {
+  font-size: 22rpx;
+  color: #8c8c8c;
+  margin-top: 4rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-spec {
+  color: #595959;
+}
+
+.row-stock-box {
+  text-align: right;
+  padding-left: 12rpx;
+}
+
+.row-stock-num {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1890ff;
+}
+
+.row-stock-unit {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  margin-left: 4rpx;
+}
+
+.empty-slot-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  color: #8c8c8c;
+  font-size: 24rpx;
+  padding: 10rpx 0;
+}
+
+.empty-plus {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #52c41a;
+}

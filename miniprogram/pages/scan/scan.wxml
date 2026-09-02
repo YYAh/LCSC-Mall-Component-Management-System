@@ -1,0 +1,212 @@
+<!-- pages/scan/scan.wxml -->
+<view class="container">
+  <!-- Scan Action Bar -->
+  <view class="scan-header card">
+    <button class="btn-primary scan-main-btn" bindtap="startScan">
+      <text class="btn-icon">📷</text>
+      <text>对准包装袋一键扫码自动入库</text>
+    </button>
+    <view class="scan-mode-hint">
+      <text>⚡ 极速入库：扫码后全自动归类、自动分配 12 行空闲插槽并保存！</text>
+    </view>
+
+    <view class="manual-input-box">
+      <input class="manual-input" placeholder="输入立创编号或型号 (如 C127509 或 LM317)" value="{{inputKeyword}}" bindinput="onKeywordInput" confirm-type="search" bindconfirm="searchByKeyword" />
+      <button class="manual-btn" bindtap="searchByKeyword" loading="{{loading}}">查立创库</button>
+    </view>
+  </view>
+
+  <!-- Auto-Inbound Success / Stock Added Result Card -->
+  <view class="card success-card" wx:if="{{autoSavedItem}}">
+    <view class="success-header">
+      <text class="success-icon">{{isAppendedStock ? '📦' : '✅'}}</text>
+      <view>
+        <view class="success-title">{{isAppendedStock ? '库存追加成功！' : '自动入库成功！'}}</view>
+        <view class="success-sub">{{isAppendedStock ? '已成功在原仓位增加库存' : '已自动分配至样品册 12 行插槽并保存'}}</view>
+      </view>
+    </view>
+
+    <!-- Component Header (Adaptive: No placeholder image if empty) -->
+    <view class="comp-preview-header">
+      <image class="comp-img" src="{{autoSavedItem.image_url}}" mode="aspectFit" wx:if="{{autoSavedItem.image_url && autoSavedItem.image_url.length > 5}}" />
+      <view class="comp-info-main {{(!autoSavedItem.image_url || autoSavedItem.image_url.length <= 5) ? 'no-img-layout' : ''}}">
+        <view class="comp-title-row">
+          <text class="badge-category">{{autoSavedItem.category || '贴片器件'}}</text>
+          <text class="badge-c-code" wx:if="{{autoSavedItem.c_code}}">{{autoSavedItem.c_code}}</text>
+        </view>
+        <view class="comp-mpn-bold {{(!autoSavedItem.image_url || autoSavedItem.image_url.length <= 5) ? 'mpn-extra-large' : ''}}">
+          {{autoSavedItem.mpn}}
+        </view>
+        <view class="comp-name-sub">{{autoSavedItem.spec || autoSavedItem.name}}</view>
+      </view>
+    </view>
+
+    <view class="saved-info-grid">
+      <view class="info-cell">
+        <text class="info-lbl">分配仓位</text>
+        <text class="info-val-badge">{{autoSavedItem.location_text || '待分配'}}</text>
+      </view>
+      <view class="info-cell">
+        <text class="info-lbl">当前库存</text>
+        <text class="info-val-bold">{{autoSavedItem.stock}} 个</text>
+      </view>
+      <view class="info-cell">
+        <text class="info-lbl">封装规格</text>
+        <text class="info-val">{{autoSavedItem.package_name || '通用'}}</text>
+      </view>
+      <view class="info-cell">
+        <text class="info-lbl">品牌</text>
+        <text class="info-val font-brand">{{autoSavedItem.brand || '国产优质/通用'}}</text>
+      </view>
+    </view>
+
+    <!-- Quick action buttons -->
+    <view class="success-actions">
+      <button class="btn-primary flex-1" bindtap="goToPrintSaved">
+        🖨️ 立即打印专属标签
+      </button>
+      <button class="btn-success flex-1" bindtap="scanNext">
+        📷 继续扫下一个
+      </button>
+    </view>
+    <button class="btn-secondary" style="margin-top: 16rpx;" bindtap="goToDetailSaved">
+      🔍 查看物料详情与修改
+    </button>
+  </view>
+
+  <!-- Manual Edit Form (Shown when user wants to edit before saving) -->
+  <view class="card" wx:elif="{{formData.c_code || formData.mpn}}">
+    <view class="card-title">
+      <text>📦 物料信息确认与调整</text>
+      <text class="badge-c-code" wx:if="{{formData.c_code}}">{{formData.c_code}}</text>
+    </view>
+
+    <view class="comp-preview-header">
+      <image class="comp-img" src="{{formData.image_url}}" mode="aspectFit" wx:if="{{formData.image_url && formData.image_url.length > 5}}" />
+      <view class="comp-info-main {{(!formData.image_url || formData.image_url.length <= 5) ? 'no-img-layout' : ''}}">
+        <view class="comp-mpn-bold">{{formData.mpn}}</view>
+        <input class="form-input comp-name-input" placeholder="元件品名" value="{{formData.name}}" bindinput="onFormInput" data-field="name" />
+        <view class="comp-tags">
+          <text class="badge-category">{{formData.category}}</text>
+          <text class="badge-brand" wx:if="{{formData.brand}}">{{formData.brand}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="form-grid">
+      <view class="form-item">
+        <view class="form-label">元件分类</view>
+        <input class="form-input" value="{{formData.category}}" bindinput="onFormInput" data-field="category" />
+      </view>
+      <view class="form-item">
+        <view class="form-label">封装</view>
+        <input class="form-input" value="{{formData.package_name}}" bindinput="onFormInput" data-field="package_name" />
+      </view>
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">品牌</view>
+      <input class="form-input" value="{{formData.brand}}" bindinput="onFormInput" data-field="brand" />
+    </view>
+
+    <view class="form-item">
+      <view class="form-label">参数数值</view>
+      <input class="form-input" value="{{formData.spec}}" bindinput="onFormInput" data-field="spec" />
+    </view>
+
+    <!-- Sample Book Location Allocator (12 Rows Per Page) -->
+    <view class="form-item">
+      <view class="form-label">存放样品册</view>
+      <picker range="{{sampleBooks}}" range-key="name" value="{{selectedBookIndex}}" bindchange="onBookChange">
+        <view class="picker-box">
+          <text>{{sampleBooks[selectedBookIndex].name || '点击选择样品册'}}</text>
+          <text class="picker-arrow">▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <view class="form-grid">
+      <view class="form-item">
+        <view class="form-label">页码 (Page)</view>
+        <picker range="{{pageOptions}}" value="{{selectedPageIndex}}" bindchange="onPageChange">
+          <view class="picker-box">
+            <text>第 {{formData.page_no || 1}} 页</text>
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">行号 (Row, 1~12)</view>
+        <picker range="{{rowOptions}}" value="{{selectedRowIndex}}" bindchange="onRowChange">
+          <view class="picker-box">
+            <text>第 {{formData.row_no || 1}} 行插槽</text>
+            <text class="picker-arrow">▼</text>
+          </view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="location-preview-banner">
+      <text>分配仓位：</text>
+      <text class="badge-location-lg">{{locationPreviewText}}</text>
+    </view>
+
+    <view class="form-grid" style="margin-top: 20rpx;">
+      <view class="form-item">
+        <view class="form-label">入库数量</view>
+        <input class="form-input qty-input" type="number" value="{{formData.stock}}" bindinput="onFormInput" data-field="stock" />
+      </view>
+      <view class="form-item">
+        <view class="form-label">安全库存预警</view>
+        <input class="form-input" type="number" value="{{formData.safe_stock}}" bindinput="onFormInput" data-field="safe_stock" />
+      </view>
+    </view>
+
+    <view class="footer-actions">
+      <button class="btn-success action-submit-btn" bindtap="manualSaveComponent" loading="{{saving}}">
+        💾 保存入库
+      </button>
+      <button class="btn-primary action-print-btn" bindtap="manualSaveAndPrint" loading="{{saving}}">
+        🖨️ 保存并打印
+      </button>
+    </view>
+  </view>
+
+  <!-- Empty state prompt -->
+  <view class="empty-box" wx:else>
+    <view class="empty-icon">📱</view>
+    <view class="empty-text">点击上方大按钮扫码嘉立创包装袋</view>
+    <view class="empty-text" style="color: #1890ff; margin-top: 8rpx;">系统将全自动识别型号、品牌与分类，并一键分配插槽！</view>
+  </view>
+
+  <!-- SZLCSC Search Candidate Modal -->
+  <view class="edit-modal-mask" wx:if="{{showCandidatesModal}}">
+    <view class="edit-modal-content">
+      <view class="edit-modal-title">
+        <text>立创商城官方元件匹配 ({{candidateList.length}}项)</text>
+        <text class="close-modal-x" bindtap="closeCandidateModal">✕</text>
+      </view>
+      <view class="paste-hint">
+        点击下方任意元器件，一键获取立创官方分类、品牌、封装与规格书：
+      </view>
+
+      <scroll-view scroll-y class="candidate-scroll-list">
+        <view class="candidate-item" wx:for="{{candidateList}}" wx:key="c_code" bindtap="selectCandidate" data-item="{{item}}">
+          <view class="candidate-top">
+            <text class="badge-c-code" wx:if="{{item.c_code}}">{{item.c_code}}</text>
+            <text class="badge-category">{{item.category}}</text>
+            <text class="candidate-brand font-brand" wx:if="{{item.brand}}">{{item.brand}}</text>
+          </view>
+          <view class="candidate-mpn-bold">{{item.mpn}}</view>
+          <view class="candidate-spec">{{item.spec || item.name}}</view>
+          <view class="candidate-pkg" wx:if="{{item.package_name}}">封装: {{item.package_name}}</view>
+        </view>
+      </scroll-view>
+
+      <view class="edit-modal-footer">
+        <button class="btn-secondary" style="width: 100%;" bindtap="closeCandidateModal">取消</button>
+      </view>
+    </view>
+  </view>
+</view>

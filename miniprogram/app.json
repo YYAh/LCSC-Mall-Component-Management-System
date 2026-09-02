@@ -1,0 +1,48 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/scan/scan",
+    "pages/components/components",
+    "pages/detail/detail",
+    "pages/books/books",
+    "pages/print/print",
+    "pages/settings/settings"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#1890ff",
+    "navigationBarTitleText": "嘉立创元器件管理",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f4f6f8"
+  },
+  "tabBar": {
+    "color": "#8c8c8c",
+    "selectedColor": "#1890ff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "看板"
+      },
+      {
+        "pagePath": "pages/scan/scan",
+        "text": "扫码录入"
+      },
+      {
+        "pagePath": "pages/components/components",
+        "text": "物料库"
+      },
+      {
+        "pagePath": "pages/books/books",
+        "text": "样品册"
+      },
+      {
+        "pagePath": "pages/settings/settings",
+        "text": "设置"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

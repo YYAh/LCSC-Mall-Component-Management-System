@@ -1,0 +1,82 @@
+<!-- pages/settings/settings.wxml -->
+<view class="container">
+  <!-- Engine Mode Switcher (100% Free Architecture) -->
+  <view class="card">
+    <view class="card-title">
+      <text>⚙️ 运行引擎与数据存储</text>
+      <view class="status-indicator online">
+        {{engineMode === 'local' ? '● 100% 永久免费单机' : '● 局域网/自建服务'}}
+      </view>
+    </view>
+
+    <view class="engine-tabs">
+      <view class="engine-tab {{engineMode === 'local' ? 'active' : ''}}" bindtap="changeEngineMode" data-mode="local">
+        <view class="engine-title">📱 100% 永久免费单机模式 (推荐)</view>
+        <view class="engine-desc">零云开发费用、零服务器成本，内置立创全能智能解码</view>
+      </view>
+      <view class="engine-tab {{engineMode === 'rest' ? 'active' : ''}}" bindtap="changeEngineMode" data-mode="rest">
+        <view class="engine-title">💻 局域网自建服务器 (Express + SQLite)</view>
+        <view class="engine-desc">连接局域网/电脑运行的后端服务，多设备多端实时同步</view>
+      </view>
+    </view>
+
+    <!-- REST Server Configuration (Shown when in REST mode) -->
+    <view class="rest-config-box" wx:if="{{engineMode === 'rest'}}">
+      <view class="rest-title">💻 局域网/自建后端地址配置：</view>
+      <view class="rest-input-row">
+        <input class="rest-input" placeholder="http://192.168.1.100:3000" value="{{serverUrl}}" bindinput="onServerUrlInput" />
+        <button class="btn-primary rest-save-btn" bindtap="saveAndTestServer" loading="{{testingServer}}">测试并保存</button>
+      </view>
+      <view class="rest-hint">
+        💡 提示：在电脑上双击运行项目根目录下的【启动后端服务.bat】，手机与电脑在同一 WiFi 下输入电脑局域网 IP 即可！
+      </view>
+    </view>
+
+    <!-- Zero-Fee Backup & Import Banner (Shown when in Local mode) -->
+    <view class="free-features-box" wx:if="{{engineMode === 'local'}}">
+      <view class="free-title">🎉 永久免费模式特色：</view>
+      <view class="free-item">✅ 无需支付任何云开发月费，全部数据安全保存在手机微信本地；</view>
+      <view class="free-item">✅ 内置全套阻容/芯片/品牌解码引擎，离线秒级自动识别真实阻值（如 100kΩ/100Ω/5.1kΩ）、原厂品牌与封装；</view>
+      <view class="free-item">✅ 支持从微信直接选取 .xlsx / .csv 表格一键导入，全自动分配样品册插槽！</view>
+    </view>
+  </view>
+
+  <!-- Bluetooth Printer Saved Setting -->
+  <view class="card">
+    <view class="card-title">
+      <text>🖨️ 默认蓝牙打印机</text>
+    </view>
+    <view class="ble-saved-box" wx:if="{{savedBle}}">
+      <view class="ble-saved-info">
+        <view class="ble-saved-name">{{savedBle.name}}</view>
+        <view class="ble-saved-id">{{savedBle.deviceId}}</view>
+      </view>
+      <button class="btn-secondary clear-ble-btn" bindtap="clearSavedBle">清除绑定</button>
+    </view>
+    <view class="empty-text" style="padding: 10rpx 0;" wx:else>
+      未绑定默认打印机，可在【标签打印】页面搜索并连接
+    </view>
+  </view>
+
+  <!-- Demo Data & Quick Setup -->
+  <view class="card">
+    <view class="card-title">
+      <text>📦 示例数据与快速体验</text>
+    </view>
+    <view class="setting-desc">
+      <text>一键向样品册中写入常用的轻触开关（C127509）、首韩拨码开关、TF卡座、贴片电阻（FRC0603 100Ω/100kΩ）等真实嘉立创物料数据，立即体验 12 行插槽可视化与排版打印。</text>
+    </view>
+    <button class="btn-secondary demo-btn" bindtap="seedDemoData" loading="{{seeding}}">
+      🚀 写入嘉立创常用元器件示例数据
+    </button>
+    <button class="btn-danger-outline demo-btn" style="margin-top: 16rpx;" bindtap="clearAllData">
+      ⚠️ 清空本地全部物料与测试数据
+    </button>
+  </view>
+
+  <!-- About System -->
+  <view class="footer-about">
+    <view>嘉立创元器件与 12 行样品册管理系统 v3.4</view>
+    <view>100% 永久免费 · Excel/XLSX 直接导入 · 贴片阻容智能解码</view>
+  </view>
+</view>

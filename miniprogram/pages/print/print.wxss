@@ -1,0 +1,174 @@
+/* pages/print/print.wxss */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16rpx;
+}
+
+.template-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12rpx;
+  padding: 16rpx 10rpx;
+  text-align: center;
+}
+
+.template-item.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  box-shadow: 0 0 10rpx rgba(24, 144, 255, 0.2);
+}
+
+.tpl-name {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #262626;
+}
+
+.tpl-size {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  margin-top: 4rpx;
+}
+
+/* Canvas Preview */
+.preview-card {
+  text-align: center;
+}
+
+.dpi-tag {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  font-weight: normal;
+}
+
+.canvas-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24rpx;
+  background: #f0f2f5;
+  border-radius: 16rpx;
+  margin: 16rpx 0;
+  min-height: 200rpx;
+}
+
+.label-canvas {
+  background: #ffffff;
+  box-shadow: 0 6rpx 20rpx rgba(0, 0, 0, 0.1);
+  border-radius: 6rpx;
+}
+
+.label-info-desc {
+  font-size: 22rpx;
+  color: #8c8c8c;
+}
+
+/* BLE Status */
+.ble-status-tag {
+  font-size: 22rpx;
+  font-weight: normal;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
+}
+
+.ble-status-tag.connected {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.ble-status-tag.disconnected {
+  background: #fff1f0;
+  color: #f5222d;
+  border: 1px solid #ffa39e;
+}
+
+.ble-search-btn {
+  width: 100%;
+  margin-top: 10rpx;
+}
+
+.device-list {
+  margin-top: 20rpx;
+  border: 1px solid #e8e8e8;
+  border-radius: 12rpx;
+  max-height: 300rpx;
+  overflow-y: scroll;
+}
+
+.device-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16rpx 20rpx;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.device-item:last-child {
+  border-bottom: none;
+}
+
+.device-name {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #262626;
+}
+
+.device-id {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  display: block;
+}
+
+.connect-action-text {
+  font-size: 24rpx;
+  color: #1890ff;
+}
+
+/* Copies */
+.copies-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30rpx;
+  padding: 10rpx 0;
+}
+
+.copy-btn {
+  width: 70rpx;
+  height: 70rpx;
+  border-radius: 50%;
+  background: #f0f2f5;
+  font-size: 36rpx;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+}
+
+.copy-num {
+  font-size: 36rpx;
+  font-weight: 700;
+  color: #1890ff;
+}
+
+/* Actions */
+.action-footer {
+  margin-top: 30rpx;
+  margin-bottom: 60rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.main-print-btn {
+  font-size: 32rpx;
+  padding: 24rpx;
+}
+
+.save-img-btn {
+  font-size: 28rpx;
+}

@@ -1,0 +1,218 @@
+<!-- pages/components/components.wxml -->
+<view class="container">
+  <!-- Search & Manage Toggle Bar -->
+  <view class="search-section">
+    <view class="search-bar" wx:if="{{!isManageMode}}">
+      <text class="search-icon">🔍</text>
+      <input class="search-input" placeholder="搜索型号、编号或参数..." value="{{keyword}}" bindinput="onSearchInput" confirm-type="search" bindconfirm="onSearchConfirm" />
+      <text class="clear-icon" wx:if="{{keyword}}" bindtap="clearSearch">✕</text>
+    </view>
+    <view class="manage-active-bar" wx:else>
+      <text class="manage-count-tip">已选中 {{selectedIdMap.length}} 项</text>
+      <button class="select-all-btn" bindtap="toggleSelectAll">
+        {{selectedIdMap.length === list.length ? '取消全选' : '全选本页'}}
+      </button>
+    </view>
+
+    <view class="manage-btn {{isManageMode ? 'active' : ''}}" bindtap="toggleManageMode">
+      <text>{{isManageMode ? '退出管理' : '⚙️ 批量管理'}}</text>
+    </view>
+    <view class="filter-toggle {{onlyLowStock ? 'active' : ''}}" bindtap="toggleLowStock" wx:if="{{!isManageMode}}">
+      <text>{{onlyLowStock ? '🔴 偏低' : '⚪ 全部'}}</text>
+    </view>
+  </view>
+
+  <!-- Filter Status Tip Banner -->
+  <view class="filter-tip-banner" wx:if="{{!isManageMode && (onlyLowStock || currentCategory || keyword)}}">
+    <view class="filter-tip-left">
+      <text class="filter-tip-tag" wx:if="{{onlyLowStock}}">🔴 仅看偏低</text>
+      <text class="filter-tip-tag" wx:if="{{currentCategory}}">【{{currentCategory}}】</text>
+      <text class="filter-tip-tag" wx:if="{{keyword}}">“{{keyword}}”</text>
+      <text class="filter-tip-count">筛选结果: {{list.length}} 项 (库中总计 {{grandTotalCount}} 项)</text>
+    </view>
+    <view class="filter-tip-clear" bindtap="resetFilters">
+      ✕ 清除筛选
+    </view>
+  </view>
+
+  <!-- Horizontal Category Scroll (Matching Image 5 Style) -->
+  <scroll-view class="category-scroll" scroll-x enable-flex wx:if="{{!isManageMode}}">
+    <view class="cat-pill {{currentCategory === '' && !onlyLowStock ? 'active' : ''}}" bindtap="selectCategory" data-cat="">
+      全部 ({{grandTotalCount || totalCount}})
+    </view>
+    <view class="cat-pill {{currentCategory === item.category ? 'active' : ''}}" wx:for="{{categories}}" wx:key="category" bindtap="selectCategory" data-cat="{{item.category}}">
+      {{item.category}} ({{item.count}})
+    </view>
+  </scroll-view>
+
+  <!-- Component Card List (Matching Image 5 High-Density Rich Layout) -->
+  <view class="comp-list" wx:if="{{list && list.length > 0}}">
+    <view class="comp-card {{item.selected ? 'card-selected' : ''}}" wx:for="{{list}}" wx:key="id" bindtap="onCardTap" data-item="{{item}}">
+      <!-- Top Row: Checkbox (in manage mode) + Category badge & Location & Date -->
+      <view class="card-top-row">
+        <view class="top-tags-left">
+          <!-- Checkbox in Manage Mode -->
+          <view class="checkbox-circle {{item.selected ? 'checked' : ''}}" wx:if="{{isManageMode}}">
+            <text class="check-tick" wx:if="{{item.selected}}">✓</text>
+          </view>
+          <text class="cat-badge">{{item.category || '贴片器件'}}</text>
+          <text class="loc-badge" wx:if="{{item.location_text}}">{{item.location_text}}</text>
+        </view>
+        <view class="top-tags-right">
+          <text class="low-stock-pill" wx:if="{{item.stock <= item.safe_stock}}">📉 库存偏低</text>
+          <text class="card-date">{{item.created_at || '2026/9/1'}}</text>
+        </view>
+      </view>
+
+      <!-- MPN Title & Stock Count -->
+      <view class="card-title-row">
+        <view class="mpn-title">{{item.mpn || item.name}}</view>
+        <view class="stock-title-box">
+          <text class="stock-lbl">库存: </text>
+          <text class="stock-num {{item.stock <= item.safe_stock ? 'text-red' : 'text-orange'}}">{{item.stock}}</text>
+        </view>
+      </view>
+
+      <!-- Subtitle: C-Code and Spec Description -->
+      <view class="card-sub-line">
+        <text class="c-code-text" wx:if="{{item.c_code}}">{{item.c_code}}</text>
+        <text class="spec-desc-text" wx:if="{{item.spec || item.name}}">{{item.spec || item.name}}</text>
+      </view>
+
+      <!-- Badges Row: Brand, Package, Spec Value -->
+      <view class="tags-row">
+        <text class="tag-pill tag-brand" wx:if="{{item.brand}}">{{item.brand}}</text>
+        <text class="tag-pill tag-pkg" wx:if="{{item.package_name}}">{{item.package_name}}</text>
+        <text class="tag-pill tag-spec" wx:if="{{item.spec}}">{{item.spec}}</text>
+      </view>
+
+      <!-- Dashed Separator -->
+      <view class="card-dashed-line" wx:if="{{!isManageMode}}"></view>
+
+      <!-- Action Buttons Row (Hidden during manage mode) -->
+      <view class="card-actions-row" catchtap="stopBubble" wx:if="{{!isManageMode}}">
+        <button class="action-card-btn btn-edit" catchtap="quickEdit" data-item="{{item}}">
+          ✏️ 修改
+        </button>
+        <button class="action-card-btn btn-del" catchtap="quickDelete" data-item="{{item}}">
+          🗑️ 删除
+        </button>
+        <button class="action-card-btn btn-out-mini" catchtap="quickOut" data-item="{{item}}">
+          - 领料
+        </button>
+        <button class="action-card-btn btn-in-mini" catchtap="quickIn" data-item="{{item}}">
+          + 入库
+        </button>
+        <button class="action-card-btn btn-print-mini" catchtap="quickPrint" data-item="{{item}}">
+          🖨️ 打印
+        </button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Empty State -->
+  <view class="empty-box" wx:elif="{{!loading}}">
+    <view class="empty-icon">📦</view>
+    <view class="empty-text">未检索到符合条件的元器件</view>
+    <view class="empty-subtext" wx:if="{{onlyLowStock}}">
+      （当前处于【仅看偏低】模式，库中所有元器件库存均在安全线以上）
+    </view>
+    <view class="empty-subtext" wx:elif="{{currentCategory || keyword}}">
+      （在【{{currentCategory || keyword}}】下未找到元器件）
+    </view>
+    <button class="btn-secondary empty-reset-btn" wx:if="{{onlyLowStock || keyword || currentCategory}}" bindtap="resetFilters">
+      🔄 重置筛选（查看库中全部 {{grandTotalCount || totalCount}} 种元器件）
+    </button>
+    <button class="btn-primary empty-add-btn" bindtap="goToScan">📷 扫码录入新元器件</button>
+  </view>
+
+  <!-- Bottom Floating Tool Bar (Normal Mode) -->
+  <view class="bottom-tools-bar" wx:if="{{!isManageMode}}">
+    <button class="tool-btn btn-import" bindtap="openImportSheet">
+      ⬆️ Excel 导入
+    </button>
+    <button class="tool-btn btn-export" bindtap="onExportExcel">
+      ⬇️ Excel 导出
+    </button>
+    <button class="tool-btn btn-scan-float" bindtap="goToScan">
+      📷 扫码录入
+    </button>
+  </view>
+
+  <!-- Bottom Floating Tool Bar (Batch Manage Mode) -->
+  <view class="bottom-tools-bar manage-bar" wx:else>
+    <button class="tool-btn btn-batch-del" bindtap="confirmBatchDelete" disabled="{{selectedIdMap.length === 0}}">
+      🗑️ 批量删除 ({{selectedIdMap.length}})
+    </button>
+    <button class="tool-btn btn-exit-manage" bindtap="toggleManageMode">
+      退出管理
+    </button>
+  </view>
+
+  <!-- Quick Edit Modal -->
+  <view class="edit-modal-mask" wx:if="{{showQuickEditModal}}">
+    <view class="edit-modal-content">
+      <view class="edit-modal-title">
+        <text>修改物料信息</text>
+        <text class="close-modal-x" bindtap="closeQuickEdit">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="edit-form-scroll">
+        <view class="edit-form-row">
+          <text class="edit-label">型　号</text>
+          <input class="edit-input font-bold" value="{{quickEditForm.mpn}}" bindinput="onQuickEditInput" data-field="mpn" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">数　量</text>
+          <input class="edit-input" type="number" value="{{quickEditForm.stock}}" bindinput="onQuickEditInput" data-field="stock" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">编　号</text>
+          <input class="edit-input" value="{{quickEditForm.c_code}}" bindinput="onQuickEditInput" data-field="c_code" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">品　牌</text>
+          <input class="edit-input" value="{{quickEditForm.brand}}" bindinput="onQuickEditInput" data-field="brand" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">参数值</text>
+          <input class="edit-input" value="{{quickEditForm.spec}}" bindinput="onQuickEditInput" data-field="spec" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">封　装</text>
+          <input class="edit-input" value="{{quickEditForm.package_name}}" bindinput="onQuickEditInput" data-field="package_name" />
+        </view>
+        <view class="edit-form-row">
+          <text class="edit-label">分　类</text>
+          <input class="edit-input" value="{{quickEditForm.category}}" bindinput="onQuickEditInput" data-field="category" />
+        </view>
+      </scroll-view>
+
+      <view class="edit-modal-footer">
+        <button class="btn-secondary" style="flex: 1;" bindtap="closeQuickEdit">取消</button>
+        <button class="btn-primary" style="flex: 2;" bindtap="saveQuickEdit">保存修改</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Excel Batch Paste Import Modal -->
+  <view class="edit-modal-mask" wx:if="{{showPasteImportModal}}">
+    <view class="edit-modal-content">
+      <view class="edit-modal-title">
+        <text>粘贴 Excel 表格批量导入</text>
+        <text class="close-modal-x" bindtap="closePasteImport">✕</text>
+      </view>
+
+      <view class="paste-hint">
+        表头支持：大类 | 厂家型号(PM) | 立创编号(PC) | 品牌 | 参数 | 封装值 | 库存数量 | 仓位 | 备注
+      </view>
+
+      <textarea class="paste-textarea" placeholder="在此粘贴从 Excel 复制的多行表格内容..." value="{{pastedText}}" bindinput="onPasteInput" maxlength="-1" />
+
+      <view class="edit-modal-footer">
+        <button class="btn-secondary" style="flex: 1;" bindtap="closePasteImport">取消</button>
+        <button class="btn-primary" style="flex: 2;" bindtap="submitPasteImport" loading="{{importing}}">解析并同步入库</button>
+      </view>
+    </view>
+  </view>
+</view>
