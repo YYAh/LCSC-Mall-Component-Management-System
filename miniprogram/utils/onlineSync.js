@@ -160,7 +160,8 @@ async function getFeishuTableId(token, appToken) {
     return tableId;
   }
 
-  throw new Error(`获取多维表格数据表失败，请检查 App Token 是否正确或应用是否有权限访问该表格`);
+  const errMsg = body.msg || (body.error && body.error.message) || JSON.stringify(body);
+  throw new Error(`获取多维表格失败 (错误码: ${body.code || '未知'}): ${errMsg}`);
 }
 
 /**
