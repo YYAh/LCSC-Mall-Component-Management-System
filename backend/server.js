@@ -42,7 +42,6 @@ app.use('/api/components', require('./routes/components'));
 app.use('/api/books', require('./routes/books'));
 app.use('/api/stock', require('./routes/stock'));
 app.use('/api/templates', require('./routes/templates'));
-app.use('/api/sync', require('./routes/sync'));
 
 // Live Web Online Spreadsheet Page (100% Free, Matching Image 1)
 app.get('/table', (req, res) => {

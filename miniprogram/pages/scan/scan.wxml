@@ -1,17 +1,78 @@
 <!-- pages/scan/scan.wxml -->
 <view class="container">
+  <!-- Pre-Scan Inbound Location Selector (扫码前预选仓位) -->
+  <view class="card pre-location-card">
+    <view class="pre-card-header">
+      <view class="pre-title-group">
+        <text class="pre-title-icon">🎯</text>
+        <text class="pre-card-title">入库目标仓位预选 (扫码前已锁定)</text>
+      </view>
+      <picker range="{{containers}}" range-key="displayName" value="{{selectedContainerIndex}}" bindchange="onContainerChange">
+        <view class="container-switch-btn">
+          <text>{{currentContainer ? (currentContainer.type === 'box' ? '📦' : '📖') : '📦'}} 切换容器 ▼</text>
+        </view>
+      </picker>
+    </view>
+
+    <!-- Container Info Line -->
+    <view class="container-info-row" wx:if="{{currentContainer}}">
+      <text class="container-name-bold">{{currentContainer.name}}</text>
+      <text class="container-code-badge">{{currentContainer.code}}</text>
+      <text class="container-type-tag">{{currentContainer.type === 'box' ? (currentContainer.grid_rows + '行×' + currentContainer.grid_cols + '列') : (currentContainer.total_pages + '页×' + currentContainer.rows_per_page + '行')}}</text>
+      <text class="container-empty-tip">余 {{currentContainer.empty_slots || 0}} 空位</text>
+    </view>
+
+    <!-- Mode Selector Tabs -->
+    <view class="alloc-mode-tabs">
+      <view class="alloc-tab {{allocMode === 'auto' ? 'active' : ''}}" bindtap="setAllocMode" data-mode="auto">
+        ⚡ 自动分配空位 (连扫自动顺延)
+      </view>
+      <view class="alloc-tab {{allocMode === 'manual' ? 'active' : ''}}" bindtap="setAllocMode" data-mode="manual">
+        📌 手动选定格子/位置
+      </view>
+    </view>
+
+    <!-- Target Location Display Banner -->
+    <view class="target-location-banner {{targetOccupiedComp ? 'banner-occupied' : 'banner-empty'}}" bindtap="openSlotPicker">
+      <view class="banner-left">
+        <view class="target-label">
+          <text>本次扫码将存入：</text>
+          <text class="target-status-tag {{targetOccupiedComp ? 'tag-warn' : 'tag-free'}}">
+            {{targetOccupiedComp ? '⚠️ 格子已有物料' : '● 空闲可入库'}}
+          </text>
+        </view>
+        <view class="target-coord-text">
+          <text class="coord-desc" wx:if="{{currentContainer.type === 'box'}}">
+            第 <text class="highlight-coord">{{targetRow}}</text> 行 第 <text class="highlight-coord">{{targetCol}}</text> 列
+          </text>
+          <text class="coord-desc" wx:else>
+            第 <text class="highlight-coord">P{{targetPage < 10 ? '0' + targetPage : targetPage}}</text> 页 第 <text class="highlight-coord">{{targetRow}}</text> 行
+          </text>
+          <text class="target-code-tag">{{targetLocationText || '待分配'}}</text>
+        </view>
+        <view class="occupied-hint" wx:if="{{targetOccupiedComp}}">
+          当前物料: {{targetOccupiedComp.mpn || targetOccupiedComp.name}} (库存: {{targetOccupiedComp.stock}})
+        </view>
+      </view>
+      <view class="banner-right">
+        <text class="change-btn-text">点此更换</text>
+        <text class="arrow-icon">▶</text>
+      </view>
+    </view>
+  </view>
+
   <!-- Scan Action Bar -->
   <view class="scan-header card">
     <button class="btn-primary scan-main-btn" bindtap="startScan">
       <text class="btn-icon">📷</text>
-      <text>对准包装袋一键扫码自动入库</text>
+      <text>对准包装袋一键扫码自动存入</text>
     </button>
     <view class="scan-mode-hint">
-      <text>⚡ 极速入库：扫码后全自动归类、自动分配 12 行空闲插槽并保存！</text>
+      <text>⚡ 扫码后将自动存入上方【预选仓位】，成功后自动推进到下一个空位！</text>
     </view>
 
     <view class="manual-input-box">
-      <input class="manual-input" placeholder="输入立创编号或型号 (如 C127509 或 LM317)" value="{{inputKeyword}}" bindinput="onKeywordInput" confirm-type="search" bindconfirm="searchByKeyword" />
+      <input class="manual-input" placeholder="输入立创编号或型号查库 (如 C127509 或 LM317)" value="{{inputKeyword}}" bindinput="onKeywordInput" confirm-type="search" bindconfirm="searchByKeyword" />
       <button class="manual-btn" bindtap="searchByKeyword" loading="{{loading}}">查立创库</button>
     </view>
   </view>
@@ -22,11 +83,11 @@
       <text class="success-icon">{{isAppendedStock ? '📦' : '✅'}}</text>
       <view>
         <view class="success-title">{{isAppendedStock ? '库存追加成功！' : '自动入库成功！'}}</view>
-        <view class="success-sub">{{isAppendedStock ? '已成功在原仓位增加库存' : '已自动分配至样品册 12 行插槽并保存'}}</view>
+        <view class="success-sub">{{isAppendedStock ? '已成功在原仓位增加库存' : '已成功存入预选仓位并保存'}}</view>
       </view>
     </view>
 
-    <!-- Component Header (Adaptive: No placeholder image if empty) -->
+    <!-- Component Header -->
     <view class="comp-preview-header">
       <image class="comp-img" src="{{autoSavedItem.image_url}}" mode="aspectFit" wx:if="{{autoSavedItem.image_url && autoSavedItem.image_url.length > 5}}" />
       <view class="comp-info-main {{(!autoSavedItem.image_url || autoSavedItem.image_url.length <= 5) ? 'no-img-layout' : ''}}">
@@ -43,7 +104,7 @@
 
     <view class="saved-info-grid">
       <view class="info-cell">
-        <text class="info-lbl">分配仓位</text>
+        <text class="info-lbl">存放仓位</text>
         <text class="info-val-badge">{{autoSavedItem.location_text || '待分配'}}</text>
       </view>
       <view class="info-cell">
@@ -66,7 +127,7 @@
         🖨️ 立即打印专属标签
       </button>
       <button class="btn-success flex-1" bindtap="scanNext">
-        📷 继续扫下一个
+        📷 继续扫下一个 (已就绪)
       </button>
     </view>
     <button class="btn-secondary" style="margin-top: 16rpx;" bindtap="goToDetailSaved">
@@ -98,114 +159,104 @@
         <view class="form-label">元件分类</view>
         <input class="form-input" value="{{formData.category}}" bindinput="onFormInput" data-field="category" />
       </view>
+
       <view class="form-item">
-        <view class="form-label">封装</view>
+        <view class="form-label">封装规格</view>
         <input class="form-input" value="{{formData.package_name}}" bindinput="onFormInput" data-field="package_name" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">品牌原厂</view>
+        <input class="form-input" value="{{formData.brand}}" bindinput="onFormInput" data-field="brand" />
+      </view>
+
+      <view class="form-item">
+        <view class="form-label">入库数量</view>
+        <input class="form-input font-bold" type="number" value="{{formData.stock}}" bindinput="onFormInput" data-field="stock" />
       </view>
     </view>
 
     <view class="form-item">
-      <view class="form-label">品牌</view>
-      <input class="form-input" value="{{formData.brand}}" bindinput="onFormInput" data-field="brand" />
-    </view>
-
-    <view class="form-item">
-      <view class="form-label">参数数值</view>
+      <view class="form-label">参数/描述</view>
       <input class="form-input" value="{{formData.spec}}" bindinput="onFormInput" data-field="spec" />
     </view>
 
-    <!-- Sample Book Location Allocator (12 Rows Per Page) -->
+    <!-- Pre-selected Location for Form -->
     <view class="form-item">
-      <view class="form-label">存放样品册</view>
-      <picker range="{{sampleBooks}}" range-key="name" value="{{selectedBookIndex}}" bindchange="onBookChange">
-        <view class="picker-box">
-          <text>{{sampleBooks[selectedBookIndex].name || '点击选择样品册'}}</text>
-          <text class="picker-arrow">▼</text>
-        </view>
-      </picker>
+      <view class="form-label">预选存放仓位</view>
+      <view class="form-location-badge">{{targetLocationText}}</view>
     </view>
 
-    <view class="form-grid">
-      <view class="form-item">
-        <view class="form-label">页码 (Page)</view>
-        <picker range="{{pageOptions}}" value="{{selectedPageIndex}}" bindchange="onPageChange">
-          <view class="picker-box">
-            <text>第 {{formData.page_no || 1}} 页</text>
-            <text class="picker-arrow">▼</text>
-          </view>
-        </picker>
-      </view>
-
-      <view class="form-item">
-        <view class="form-label">行号 (Row, 1~12)</view>
-        <picker range="{{rowOptions}}" value="{{selectedRowIndex}}" bindchange="onRowChange">
-          <view class="picker-box">
-            <text>第 {{formData.row_no || 1}} 行插槽</text>
-            <text class="picker-arrow">▼</text>
-          </view>
-        </picker>
-      </view>
-    </view>
-
-    <view class="location-preview-banner">
-      <text>分配仓位：</text>
-      <text class="badge-location-lg">{{locationPreviewText}}</text>
-    </view>
-
-    <view class="form-grid" style="margin-top: 20rpx;">
-      <view class="form-item">
-        <view class="form-label">入库数量</view>
-        <input class="form-input qty-input" type="number" value="{{formData.stock}}" bindinput="onFormInput" data-field="stock" />
-      </view>
-      <view class="form-item">
-        <view class="form-label">安全库存预警</view>
-        <input class="form-input" type="number" value="{{formData.safe_stock}}" bindinput="onFormInput" data-field="safe_stock" />
-      </view>
-    </view>
-
-    <view class="footer-actions">
-      <button class="btn-success action-submit-btn" bindtap="manualSaveComponent" loading="{{saving}}">
-        💾 保存入库
+    <view class="form-actions">
+      <button class="btn-primary" bindtap="saveComponentForm" loading="{{saving}}">
+        💾 保存并入库到预选仓位
       </button>
-      <button class="btn-primary action-print-btn" bindtap="manualSaveAndPrint" loading="{{saving}}">
-        🖨️ 保存并打印
+      <button class="btn-secondary" style="margin-top: 16rpx;" bindtap="resetForm">
+        取消
       </button>
     </view>
   </view>
 
-  <!-- Empty state prompt -->
-  <view class="empty-box" wx:else>
-    <view class="empty-icon">📱</view>
-    <view class="empty-text">点击上方大按钮扫码嘉立创包装袋</view>
-    <view class="empty-text" style="color: #1890ff; margin-top: 8rpx;">系统将全自动识别型号、品牌与分类，并一键分配插槽！</view>
-  </view>
-
-  <!-- SZLCSC Search Candidate Modal -->
-  <view class="edit-modal-mask" wx:if="{{showCandidatesModal}}">
-    <view class="edit-modal-content">
-      <view class="edit-modal-title">
-        <text>立创商城官方元件匹配 ({{candidateList.length}}项)</text>
-        <text class="close-modal-x" bindtap="closeCandidateModal">✕</text>
+  <!-- Candidates Modal (Multiple candidates found) -->
+  <view class="modal-overlay" wx:if="{{showCandidatesModal}}">
+    <view class="modal-card">
+      <view class="modal-header">
+        <text class="modal-title">请选择匹配的元器件</text>
+        <text class="modal-close" bindtap="closeCandidatesModal">✕</text>
       </view>
-      <view class="paste-hint">
-        点击下方任意元器件，一键获取立创官方分类、品牌、封装与规格书：
-      </view>
-
-      <scroll-view scroll-y class="candidate-scroll-list">
+      <view class="modal-body">
         <view class="candidate-item" wx:for="{{candidateList}}" wx:key="c_code" bindtap="selectCandidate" data-item="{{item}}">
-          <view class="candidate-top">
-            <text class="badge-c-code" wx:if="{{item.c_code}}">{{item.c_code}}</text>
-            <text class="badge-category">{{item.category}}</text>
-            <text class="candidate-brand font-brand" wx:if="{{item.brand}}">{{item.brand}}</text>
+          <view class="candidate-row-top">
+            <text class="candidate-c-code">{{item.c_code}}</text>
+            <text class="candidate-mpn">{{item.mpn}}</text>
           </view>
-          <view class="candidate-mpn-bold">{{item.mpn}}</view>
-          <view class="candidate-spec">{{item.spec || item.name}}</view>
-          <view class="candidate-pkg" wx:if="{{item.package_name}}">封装: {{item.package_name}}</view>
+          <view class="candidate-name">{{item.name}}</view>
+          <view class="candidate-meta">
+            <text>{{item.category}}</text>
+            <text wx:if="{{item.package_name}}"> | {{item.package_name}}</text>
+            <text wx:if="{{item.brand}}"> | {{item.brand}}</text>
+          </view>
         </view>
-      </scroll-view>
+      </view>
+    </view>
+  </view>
 
-      <view class="edit-modal-footer">
-        <button class="btn-secondary" style="width: 100%;" bindtap="closeCandidateModal">取消</button>
+  <!-- Interactive Matrix Grid Slot Picker Modal (手动选定格子弹窗) -->
+  <view class="modal-overlay" wx:if="{{showPickerModal}}">
+    <view class="modal-card">
+      <view class="modal-header">
+        <text class="modal-title">选定入库仓位位置</text>
+        <text class="modal-close" bindtap="closeSlotPicker">✕</text>
+      </view>
+      <view class="modal-body">
+        <!-- If Box: Render interactive grid -->
+        <view wx:if="{{currentContainer.type === 'box'}}">
+          <view class="picker-tip">点击下方抽屉格子，即可直接指定为入库目标：</view>
+          <view class="picker-box-grid" style="grid-template-columns: repeat({{currentContainer.grid_cols || 4}}, 1fr);">
+            <view class="picker-cell {{item.is_empty ? 'p-empty' : 'p-occupied'}} {{targetRow === item.row_no && targetCol === item.col_no ? 'p-selected' : ''}}" wx:for="{{pickerSlots}}" wx:key="slot_coord" bindtap="selectGridCell" data-row="{{item.row_no}}" data-col="{{item.col_no}}" data-occupied="{{!item.is_empty ? item.component : null}}">
+              <view class="p-coord">{{item.slot_coord}}</view>
+              <view class="p-status">{{item.is_empty ? '+空闲' : item.component.mpn}}</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- If Book: Page & Row selector -->
+        <view wx:else class="book-row-picker-box">
+          <view class="picker-tip">选择页面与行号：</view>
+          <view class="book-picker-row">
+            <text class="bp-lbl">页码：</text>
+            <picker range="{{bookPageOptions}}" value="{{targetPage - 1}}" bindchange="onTargetPageChange">
+              <view class="bp-input">第 P{{targetPage < 10 ? '0' + targetPage : targetPage}} 页 ▼</view>
+            </picker>
+          </view>
+          <view class="book-picker-row" style="margin-top: 16rpx;">
+            <text class="bp-lbl">行号：</text>
+            <picker range="{{bookRowOptions}}" value="{{targetRow - 1}}" bindchange="onTargetRowChange">
+              <view class="bp-input">第 {{targetRow}} 行 ▼</view>
+            </picker>
+          </view>
+          <button class="btn-primary" style="margin-top: 24rpx;" bindtap="closeSlotPicker">确定指定该仓位</button>
+        </view>
       </view>
     </view>
   </view>

@@ -6,7 +6,6 @@
 
 const qrParser = require('./qrParser');
 const { classifyComponent, decodeResistorSpec, decodeCapacitorSpec } = require('./classifier');
-const onlineSync = require('./onlineSync');
 
 function getEngineMode() {
   return wx.getStorageSync('ENGINE_MODE') || 'local';
@@ -265,7 +264,7 @@ function doesComponentBelongToBook(comp, book) {
   const cLoc = String(comp.location_text || '');
 
   if (cBookId && (cBookId === bId || cBookId === bCode)) return true;
-  if (bCode && cLoc.startsWith(bCode)) return true;
+  if (bCode && (cLoc.startsWith(bCode) || cLoc.includes(bCode))) return true;
   return false;
 }
 
@@ -659,6 +658,7 @@ const api = {
       book_id: bookId || '',
       page_no: pageNo,
       row_no: rowNo,
+      col_no: Number(data.col_no) || 1,
       location_text: locText,
       stock: Number(data.stock) || 0,
       safe_stock: Number(data.safe_stock) || 5,
@@ -669,13 +669,6 @@ const api = {
     if (mode === 'rest') {
       try {
         const res = await restRequest('/components', 'POST', item);
-        onlineSync.syncStockEvent({
-          event: 'CREATE',
-          component: item,
-          changeQty: item.stock,
-          balanceQty: item.stock,
-          remark: '录入新物料'
-        }).catch(() => {});
         return res;
       } catch (e) {}
     }
@@ -707,15 +700,6 @@ const api = {
       LocalStorage._set('LOCAL_LOGS', logs);
     }
 
-    // Trigger Real-time Online Sheet Sync
-    onlineSync.syncStockEvent({
-      event: 'CREATE',
-      component: item,
-      changeQty: item.stock,
-      balanceQty: item.stock,
-      remark: '录入新物料'
-    }).catch(() => {});
-
     return { success: true, data: item };
   },
 
@@ -727,11 +711,6 @@ const api = {
     if (mode === 'rest') {
       try {
         const res = await restRequest(`/components/${id}`, 'PUT', data);
-        onlineSync.syncStockEvent({
-          event: 'UPDATE',
-          component: { id, ...data },
-          remark: '修改物料信息'
-        }).catch(() => {});
         return res;
       } catch (e) {}
     }
@@ -746,14 +725,6 @@ const api = {
       return c;
     });
     LocalStorage._set('LOCAL_COMPS', comps);
-
-    if (updatedItem) {
-      onlineSync.syncStockEvent({
-        event: 'UPDATE',
-        component: updatedItem,
-        remark: '修改物料信息'
-      }).catch(() => {});
-    }
 
     return { success: true, msg: '修改成功' };
   },
@@ -792,7 +763,7 @@ const api = {
     return { success: true, count: initialLen - comps.length };
   },
 
-  // Sample Books
+  // Containers (Sample Books & X*X Component Boxes)
   async getBooks() {
     const mode = getEngineMode();
     if (mode === 'rest') {
@@ -801,22 +772,42 @@ const api = {
       } catch (e) {}
     }
 
-    const books = LocalStorage._get('LOCAL_BOOKS', []);
+    const defaultContainers = [
+      { id: 'b_1', name: '0603 贴片电阻专用册', code: 'B01', type: 'book', total_pages: 20, rows_per_page: 12, category: '贴片电阻' },
+      { id: 'b_2', name: '0603 贴片电容专用册', code: 'B02', type: 'book', total_pages: 20, rows_per_page: 12, category: '贴片电容' },
+      { id: 'box_1', name: '1号 4×6 常用贴片盒', code: 'BOX01', type: 'box', grid_rows: 4, grid_cols: 6, category: '常用元器件' },
+      { id: 'box_2', name: '2号 3×4 芯片抽屉柜', code: 'BOX02', type: 'box', grid_rows: 3, grid_cols: 4, category: '芯片/集成电路' },
+      { id: 'b_3', name: '0805/1206 贴片阻容样品册', code: 'B03', type: 'book', total_pages: 20, rows_per_page: 12, category: '贴片电阻' },
+      { id: 'b_4', name: '常用贴片芯片/二三极管样品册', code: 'B04', type: 'book', total_pages: 20, rows_per_page: 12, category: '二极管' },
+      { id: 'b_5', name: '轻触按键与常用连接器插槽册', code: 'B05', type: 'book', total_pages: 20, rows_per_page: 12, category: '轻触开关' }
+    ];
+
+    let books = LocalStorage._get('LOCAL_BOOKS', null);
+    if (!books || books.length === 0) {
+      books = defaultContainers;
+      LocalStorage._set('LOCAL_BOOKS', books);
+    }
+
     const comps = LocalStorage._get('LOCAL_COMPS', []);
     const formatted = books.map(b => {
+      const isBox = b.type === 'box';
       const used = comps.filter(c => doesComponentBelongToBook(c, b)).length;
-      const total = (b.total_pages || 20) * (b.rows_per_page || 12);
+      const total = isBox 
+        ? ((Number(b.grid_rows) || 3) * (Number(b.grid_cols) || 4)) 
+        : ((Number(b.total_pages) || 20) * (Number(b.rows_per_page) || 12));
       return {
         ...b,
-        used_slots: used,
+        type: b.type || 'book',
         total_slots: total,
-        empty_slots: Math.max(0, total - used)
+        used_slots: used,
+        empty_slots: Math.max(0, total - used),
+        usage_percent: total > 0 ? Math.round((used / total) * 100) : 0
       };
     });
     return { success: true, data: formatted };
   },
 
-  // 12-Row Page Slot Map
+  // Container Page or Grid View
   async getBookPage(bookId, pageNo) {
     const pNo = Number(pageNo) || 1;
     const mode = getEngineMode();
@@ -832,11 +823,53 @@ const api = {
     const compsRes = await this.getComponents();
     const comps = (compsRes.data && compsRes.data.list) || [];
 
+    if (!book) return { success: false, msg: '未找到该仓位容器' };
+
+    const isBox = book.type === 'box';
+    if (isBox) {
+      const gridRows = Number(book.grid_rows) || 3;
+      const gridCols = Number(book.grid_cols) || 4;
+      const boxComps = comps.filter(c => doesComponentBelongToBook(c, book));
+
+      const slotGrid = [];
+      for (let r = 1; r <= gridRows; r++) {
+        for (let c = 1; c <= gridCols; c++) {
+          const comp = boxComps.find(item => {
+            if (Number(item.row_no) === r && Number(item.col_no) === c) return true;
+            if (item.location_text && (item.location_text.includes(`R${String(r).padStart(2, '0')}-C${String(c).padStart(2, '0')}`) || item.location_text.includes(`R${r}-C${c}`))) return true;
+            return false;
+          });
+
+          slotGrid.push({
+            row_no: r,
+            col_no: c,
+            slot_coord: `R${r}-C${c}`,
+            location_text: `${book.code || 'BOX'}-R${String(r).padStart(2, '0')}-C${String(c).padStart(2, '0')}`,
+            is_empty: !comp,
+            component: comp || null
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          book,
+          is_box: true,
+          grid_rows: gridRows,
+          grid_cols: gridCols,
+          total_slots: gridRows * gridCols,
+          slots: slotGrid
+        }
+      };
+    }
+
+    // Sample Book: Page Rows
     const pageComps = comps.filter(c => 
       doesComponentBelongToBook(c, book) && Number(c.page_no) === pNo
     );
 
-    const rowsCount = (book && book.rows_per_page) || 12;
+    const rowsCount = Number(book.rows_per_page) || 12;
     const slotMap = [];
     for (let r = 1; r <= rowsCount; r++) {
       const found = pageComps.find(c => Number(c.row_no) === r);
@@ -851,15 +884,16 @@ const api = {
       success: true,
       data: {
         book,
+        is_box: false,
         page_no: pNo,
-        total_pages: (book && book.total_pages) || 20,
+        total_pages: Number(book.total_pages) || 20,
         rows_per_page: rowsCount,
         slots: slotMap
       }
     };
   },
 
-  // Next Empty Slot
+  // Next Empty Slot in Container
   async getBookNextEmpty(bookId) {
     const mode = getEngineMode();
     if (mode === 'rest') {
@@ -871,12 +905,57 @@ const api = {
     const booksRes = await this.getBooks();
     const books = booksRes.data || [];
     const book = books.find(b => String(b.id) === String(bookId) || String(b._id) === String(bookId) || String(b.code) === String(bookId)) || books[0];
-    if (!book) return { success: false, msg: '未找到样品册' };
+    if (!book) return { success: false, msg: '未找到仓位容器' };
 
     const compsRes = await this.getComponents();
     const comps = (compsRes.data && compsRes.data.list) || [];
     const bookComps = comps.filter(c => doesComponentBelongToBook(c, book));
 
+    const isBox = book.type === 'box';
+    if (isBox) {
+      const gridRows = Number(book.grid_rows) || 3;
+      const gridCols = Number(book.grid_cols) || 4;
+      const occupiedSet = new Set();
+      bookComps.forEach(c => {
+        if (c.row_no && c.col_no) {
+          occupiedSet.add(`${Number(c.row_no)}_${Number(c.col_no)}`);
+        }
+        if (c.location_text) {
+          const m = c.location_text.match(/R(\d+)-C(\d+)/i);
+          if (m) occupiedSet.add(`${parseInt(m[1], 10)}_${parseInt(m[2], 10)}`);
+        }
+      });
+
+      for (let r = 1; r <= gridRows; r++) {
+        for (let c = 1; c <= gridCols; c++) {
+          if (!occupiedSet.has(`${r}_${c}`)) {
+            const locText = `${book.code || 'BOX01'}-R${String(r).padStart(2, '0')}-C${String(c).padStart(2, '0')}`;
+            return {
+              success: true,
+              data: {
+                book_id: book.id || book._id,
+                book_name: book.name,
+                book_code: book.code,
+                book_type: 'box',
+                row_no: r,
+                col_no: c,
+                location_text: locText
+              }
+            };
+          }
+        }
+      }
+
+      return { 
+        success: true, 
+        data: { 
+          is_full: true,
+          msg: `元件盒【${book.name}】已存满 (${gridRows * gridCols}格)`
+        } 
+      };
+    }
+
+    // Book type
     const occupiedSet = new Set();
     bookComps.forEach(c => {
       if (c.page_no && c.row_no) {
@@ -890,8 +969,8 @@ const api = {
       }
     });
 
-    const totalPages = book.total_pages || 20;
-    const rowsPerPage = book.rows_per_page || 12;
+    const totalPages = Number(book.total_pages) || 20;
+    const rowsPerPage = Number(book.rows_per_page) || 12;
 
     for (let p = 1; p <= totalPages; p++) {
       for (let r = 1; r <= rowsPerPage; r++) {
@@ -903,6 +982,7 @@ const api = {
               book_id: book.id || book._id,
               book_name: book.name,
               book_code: book.code,
+              book_type: 'book',
               page_no: p,
               row_no: r,
               location_text: locText
@@ -912,33 +992,37 @@ const api = {
       }
     }
 
-    return { success: true, data: { is_full: true } };
+    return { success: true, data: { is_full: true, msg: '该样品册已存满' } };
   },
 
-  // Create Book
+  // Create Container (Sample book or X*X Component box)
   async createBook(data) {
     const mode = getEngineMode();
-    const book = {
+    const type = data.type || (data.grid_rows ? 'box' : 'book');
+    const container = {
       ...data,
+      type,
       total_pages: Number(data.total_pages) || 20,
       rows_per_page: Number(data.rows_per_page) || 12,
+      grid_rows: Number(data.grid_rows) || 3,
+      grid_cols: Number(data.grid_cols) || 4,
       created_at: new Date().toLocaleDateString()
     };
 
     if (mode === 'rest') {
       try {
-        return await restRequest('/books', 'POST', book);
+        return await restRequest('/books', 'POST', container);
       } catch (e) {}
     }
 
     const books = LocalStorage._get('LOCAL_BOOKS', []);
-    book.id = 'b_' + Date.now();
-    books.push(book);
+    container.id = (type === 'box' ? 'box_' : 'b_') + Date.now();
+    books.push(container);
     LocalStorage._set('LOCAL_BOOKS', books);
-    return { success: true, data: book };
+    return { success: true, data: container };
   },
 
-  // Delete Book
+  // Delete Container
   async deleteBook(bookId) {
     const mode = getEngineMode();
     if (mode === 'rest') {
@@ -950,7 +1034,7 @@ const api = {
     let books = LocalStorage._get('LOCAL_BOOKS', []);
     books = books.filter(b => String(b.id) !== String(bookId) && String(b._id) !== String(bookId));
     LocalStorage._set('LOCAL_BOOKS', books);
-    return { success: true, msg: '样品册已删除' };
+    return { success: true, msg: '容器已删除' };
   },
 
   // Stock Operations
@@ -988,16 +1072,6 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
-    // Trigger Real-time Online Sheet Sync
-    onlineSync.syncStockEvent({
-      event: 'STOCK_IN',
-      component: comp,
-      changeQty: addQty,
-      balanceQty: newStock,
-      orderNo: order_no || comp.order_no || '',
-      remark
-    }).catch(() => {});
-
     return { success: true, msg: `入库成功，当前库存：${newStock}` };
   },
 
@@ -1015,15 +1089,7 @@ const api = {
 
     if (mode === 'rest') {
       try {
-        const res = await restRequest('/stock/out', 'POST', data);
-        onlineSync.syncStockEvent({
-          event: 'STOCK_OUT',
-          component: comp,
-          changeQty: -outQty,
-          balanceQty: newStock,
-          remark
-        }).catch(() => {});
-        return res;
+        return await restRequest('/stock/out', 'POST', data);
       } catch (e) {}
     }
 
@@ -1045,15 +1111,6 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
-    // Trigger Real-time Online Sheet Sync
-    onlineSync.syncStockEvent({
-      event: 'STOCK_OUT',
-      component: comp,
-      changeQty: -outQty,
-      balanceQty: newStock,
-      remark
-    }).catch(() => {});
-
     return { success: true, msg: `领料成功，剩余库存：${newStock}` };
   },
 
@@ -1069,13 +1126,6 @@ const api = {
     if (mode === 'rest') {
       try {
         const res = await restRequest('/stock/adjust', 'POST', data);
-        onlineSync.syncStockEvent({
-          event: 'STOCK_ADJUST',
-          component: comp,
-          changeQty: diff,
-          balanceQty: newStock,
-          remark
-        }).catch(() => {});
         return res;
       } catch (e) {}
     }
@@ -1098,15 +1148,6 @@ const api = {
     });
     LocalStorage._set('LOCAL_LOGS', logs);
 
-    // Trigger Real-time Online Sheet Sync
-    onlineSync.syncStockEvent({
-      event: 'STOCK_ADJUST',
-      component: comp,
-      changeQty: diff,
-      balanceQty: newStock,
-      remark
-    }).catch(() => {});
-
     return { success: true, msg: `校准成功，当前库存：${newStock}` };
   },
 
@@ -1125,9 +1166,7 @@ const api = {
         { id: 3, name: '大号抽屉标签 (50x30mm)', width_mm: 50, height_mm: 30, is_default: 0 }
       ])
     };
-  },
-
-  onlineSync
+  }
 };
 
 module.exports = api;

@@ -1,18 +1,21 @@
 <!-- pages/books/books.wxml -->
 <view class="container">
-  <!-- Book Header & Selector -->
+  <!-- Container Header & Selector -->
   <view class="card book-header-card">
     <view class="book-select-row">
-      <picker range="{{books}}" range-key="name" value="{{currentBookIndex}}" bindchange="onBookChange">
+      <picker range="{{books}}" range-key="displayName" value="{{currentBookIndex}}" bindchange="onBookChange">
         <view class="book-picker">
-          <text class="book-name-title">{{currentBook.name || '选择样品册'}}</text>
+          <text class="container-type-badge {{currentBook.type === 'box' ? 'badge-box' : 'badge-book'}}">
+            {{currentBook.type === 'box' ? '📦 元件盒' : '📖 样本册'}}
+          </text>
+          <text class="book-name-title">{{currentBook.name || '选择仓位容器'}}</text>
           <text class="picker-arrow">▼ 切换</text>
         </view>
       </picker>
 
       <view class="book-action-btns">
-        <button class="add-book-btn" bindtap="openAddBookModal">+ 新建册</button>
-        <button class="del-book-btn" bindtap="confirmDeleteBook" wx:if="{{books.length > 1}}">🗑️ 删除此册</button>
+        <button class="add-book-btn" bindtap="openAddModal">+ 新建容器</button>
+        <button class="del-book-btn" bindtap="confirmDeleteBook" wx:if="{{books.length > 1}}">🗑️ 删除</button>
       </view>
     </view>
 
@@ -20,78 +23,210 @@
     <view class="book-metrics" wx:if="{{currentBook}}">
       <view class="metric-item">
         <text class="metric-val">{{currentBook.code}}</text>
-        <text class="metric-lbl">册编号</text>
+        <text class="metric-lbl">容器编号</text>
       </view>
       <view class="metric-item">
-        <text class="metric-val">{{currentBook.total_pages || 20}} 页</text>
-        <text class="metric-lbl">总容量</text>
+        <text class="metric-val" wx:if="{{currentBook.type === 'box'}}">
+          {{currentBook.grid_rows || 3}}行 × {{currentBook.grid_cols || 4}}列
+        </text>
+        <text class="metric-val" wx:else>
+          {{currentBook.total_pages || 20}}页 × {{currentBook.rows_per_page || 12}}行
+        </text>
+        <text class="metric-lbl">规格结构</text>
       </view>
       <view class="metric-item">
-        <text class="metric-val text-green">{{currentBook.used_slots || 0}} / {{currentBook.total_slots || 240}}</text>
-        <text class="metric-lbl">已用插槽 (行)</text>
+        <text class="metric-val text-green">{{currentBook.used_slots || 0}} / {{currentBook.total_slots || 0}}</text>
+        <text class="metric-lbl">{{currentBook.type === 'box' ? '已用抽屉' : '已用插槽'}}</text>
       </view>
       <view class="metric-item">
         <text class="metric-val text-blue">{{currentBook.empty_slots || 0}}</text>
-        <text class="metric-lbl">空余插槽</text>
+        <text class="metric-lbl">{{currentBook.type === 'box' ? '空余抽屉' : '空余插槽'}}</text>
       </view>
     </view>
   </view>
 
-  <!-- Page Navigator -->
-  <view class="page-navigator card">
-    <button class="nav-arrow-btn" bindtap="prevPage" disabled="{{currentPage <= 1}}">&lt; 上一页</button>
-    
-    <picker range="{{pageList}}" value="{{currentPage - 1}}" bindchange="onPageJump">
-      <view class="page-current-tag">
-        <text class="page-badge">第 P{{currentPage < 10 ? '0' + currentPage : currentPage}} 页</text>
-        <text class="page-sub">共 {{currentBook.total_pages || 20}} 页 (点击跳转)</text>
-      </view>
-    </picker>
-
-    <button class="nav-arrow-btn" bindtap="nextPage" disabled="{{currentPage >= (currentBook.total_pages || 20)}}">下一页 &gt;</button>
-  </view>
-
-  <!-- 12-Row Visual Sample Book Page Grid -->
-  <view class="sample-book-page">
+  <!-- ============================================== -->
+  <!-- MODE A: X*X Component Box 2D Grid View         -->
+  <!-- ============================================== -->
+  <view class="card box-grid-card" wx:if="{{currentBook.type === 'box'}}">
     <view class="page-title-banner">
-      <text>📖 {{currentBook.name}} - 第 {{currentPage}} 页 (12 行插槽视图)</text>
+      <view class="banner-title-left">
+        <text class="banner-icon">📦</text>
+        <text>{{currentBook.name}} ({{currentBook.grid_rows || 3}}行 × {{currentBook.grid_cols || 4}}列 抽屉盒矩阵)</text>
+      </view>
+      <text class="banner-tip">点击空闲格子可直接设为入库目标</text>
     </view>
 
-    <view class="slots-container">
-      <block wx:for="{{slots}}" wx:key="row_no">
-        <!-- Row Item: Occupied -->
-        <view class="slot-row occupied" wx:if="{{!item.is_empty}}" bindtap="viewComponentDetail" data-id="{{item.component.id || item.component._id}}">
-          <view class="row-index-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
-          
-          <image class="row-thumb" src="{{item.component.image_url}}" mode="aspectFit" wx:if="{{item.component.image_url && item.component.image_url.length > 5}}" />
-          
-          <view class="row-info">
-            <view class="row-top-line">
-              <text class="badge-category-mini">{{item.component.category}}</text>
-              <text class="badge-c-code" wx:if="{{item.component.c_code}}">{{item.component.c_code}}</text>
-              <text class="row-name">{{item.component.mpn || item.component.name}}</text>
-            </view>
-            <view class="row-sub-line">
-              <text class="row-spec">{{item.component.spec || item.component.name}}</text>
-              <text class="row-pkg" wx:if="{{item.component.package_name}}"> | {{item.component.package_name}}</text>
-            </view>
-          </view>
-
-          <view class="row-stock-box">
-            <text class="row-stock-num">{{item.component.stock}}</text>
-            <text class="row-stock-unit">{{item.component.unit || '个'}}</text>
+    <!-- Visual 2D Grid -->
+    <view class="box-grid-matrix" style="grid-template-columns: repeat({{currentBook.grid_cols || 4}}, 1fr);">
+      <block wx:for="{{slots}}" wx:key="slot_coord">
+        <!-- Occupied Drawer -->
+        <view class="drawer-cell occupied" wx:if="{{!item.is_empty}}" bindtap="viewComponentDetail" data-id="{{item.component.id || item.component._id}}">
+          <view class="drawer-coord-badge">{{item.slot_coord}}</view>
+          <view class="drawer-comp-mpn">{{item.component.mpn || item.component.name}}</view>
+          <view class="drawer-comp-sub" wx:if="{{item.component.c_code}}">{{item.component.c_code}}</view>
+          <view class="drawer-stock-badge">
+            <text class="stock-num">{{item.component.stock}}</text>
+            <text class="stock-unit">{{item.component.unit || '个'}}</text>
           </view>
         </view>
 
-        <!-- Row Item: Empty Slot -->
-        <view class="slot-row empty" wx:else bindtap="fillEmptySlot" data-row="{{item.row_no}}">
-          <view class="row-index-badge empty-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
-          <view class="empty-slot-content">
-            <text class="empty-plus">+</text>
-            <text class="empty-slot-text">第 {{item.row_no}} 行空闲插槽 · 点击扫码放入元件</text>
+        <!-- Empty Drawer -->
+        <view class="drawer-cell empty" wx:else bindtap="fillEmptySlot" data-row="{{item.row_no}}" data-col="{{item.col_no}}">
+          <view class="drawer-coord-badge empty-coord">{{item.slot_coord}}</view>
+          <view class="empty-cell-center">
+            <text class="empty-plus-icon">+</text>
+            <text class="empty-text">空闲抽屉</text>
           </view>
         </view>
       </block>
+    </view>
+  </view>
+
+  <!-- ============================================== -->
+  <!-- MODE B: Sample Book Multi-page Row View        -->
+  <!-- ============================================== -->
+  <view wx:else>
+    <!-- Page Navigator -->
+    <view class="page-navigator card">
+      <button class="nav-arrow-btn" bindtap="prevPage" disabled="{{currentPage <= 1}}">&lt; 上一页</button>
+      
+      <picker range="{{pageList}}" value="{{currentPage - 1}}" bindchange="onPageJump">
+        <view class="page-current-tag">
+          <text class="page-badge">第 P{{currentPage < 10 ? '0' + currentPage : currentPage}} 页</text>
+          <text class="page-sub">共 {{currentBook.total_pages || 20}} 页 (点击跳转)</text>
+        </view>
+      </picker>
+
+      <button class="nav-arrow-btn" bindtap="nextPage" disabled="{{currentPage >= (currentBook.total_pages || 20)}}">下一页 &gt;</button>
+    </view>
+
+    <!-- Page Grid List -->
+    <view class="sample-book-page">
+      <view class="page-title-banner">
+        <text>📖 {{currentBook.name}} - 第 {{currentPage}} 页 (每页 {{currentBook.rows_per_page || 12}} 行插槽)</text>
+      </view>
+
+      <view class="slots-container">
+        <block wx:for="{{slots}}" wx:key="row_no">
+          <!-- Row Item: Occupied -->
+          <view class="slot-row occupied" wx:if="{{!item.is_empty}}" bindtap="viewComponentDetail" data-id="{{item.component.id || item.component._id}}">
+            <view class="row-index-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
+            
+            <image class="row-thumb" src="{{item.component.image_url}}" mode="aspectFit" wx:if="{{item.component.image_url && item.component.image_url.length > 5}}" />
+            
+            <view class="row-info">
+              <view class="row-top-line">
+                <text class="badge-category-mini">{{item.component.category}}</text>
+                <text class="badge-c-code" wx:if="{{item.component.c_code}}">{{item.component.c_code}}</text>
+                <text class="row-name">{{item.component.mpn || item.component.name}}</text>
+              </view>
+              <view class="row-sub-line">
+                <text class="row-spec">{{item.component.spec || item.component.name}}</text>
+                <text class="row-pkg" wx:if="{{item.component.package_name}}"> | {{item.component.package_name}}</text>
+              </view>
+            </view>
+
+            <view class="row-stock-box">
+              <text class="row-stock-num">{{item.component.stock}}</text>
+              <text class="row-stock-unit">{{item.component.unit || '个'}}</text>
+            </view>
+          </view>
+
+          <!-- Row Item: Empty Slot -->
+          <view class="slot-row empty" wx:else bindtap="fillEmptySlot" data-row="{{item.row_no}}">
+            <view class="row-index-badge empty-badge">{{item.row_no < 10 ? '0' + item.row_no : item.row_no}}</view>
+            <view class="empty-slot-content">
+              <text class="empty-plus">+</text>
+              <text class="empty-slot-text">第 {{item.row_no}} 行空闲插槽 · 点击设为入库目标</text>
+            </view>
+          </view>
+        </block>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============================================== -->
+  <!-- Rich Modal: Add Custom Container               -->
+  <!-- ============================================== -->
+  <view class="modal-overlay" wx:if="{{showAddModal}}">
+    <view class="modal-card">
+      <view class="modal-header">
+        <text class="modal-title">新建仓位容器</text>
+        <text class="modal-close" bindtap="closeAddModal">✕</text>
+      </view>
+
+      <view class="modal-body">
+        <!-- Type Switcher -->
+        <view class="form-item">
+          <view class="form-label">容器类型：</view>
+          <view class="type-selector-tabs">
+            <view class="type-tab {{newContainer.type === 'box' ? 'active' : ''}}" bindtap="setNewType" data-type="box">
+              📦 X×X 元件盒/抽屉柜
+            </view>
+            <view class="type-tab {{newContainer.type === 'book' ? 'active' : ''}}" bindtap="setNewType" data-type="book">
+              📖 元器件样本册
+            </view>
+          </view>
+        </view>
+
+        <!-- Name -->
+        <view class="form-item">
+          <view class="form-label">容器名称：</view>
+          <input class="form-input" placeholder="{{newContainer.type === 'box' ? '如: 3号 4x6 贴片电容盒' : '如: 0402贴片电阻册'}}" value="{{newContainer.name}}" bindinput="onNewInput" data-field="name" />
+        </view>
+
+        <!-- Code -->
+        <view class="form-item">
+          <view class="form-label">仓位编号：</view>
+          <input class="form-input" placeholder="如: BOX03 或 B06" value="{{newContainer.code}}" bindinput="onNewInput" data-field="code" />
+        </view>
+
+        <!-- Category -->
+        <view class="form-item">
+          <view class="form-label">适用大类：</view>
+          <input class="form-input" placeholder="如: 贴片电阻、轻触开关、集成电路等" value="{{newContainer.category}}" bindinput="onNewInput" data-field="category" />
+        </view>
+
+        <!-- Dynamic Size Inputs for BOX -->
+        <view wx:if="{{newContainer.type === 'box'}}">
+          <view class="form-row-2">
+            <view class="form-item flex-1">
+              <view class="form-label">行数 (Rows)：</view>
+              <input class="form-input" type="number" placeholder="如 4" value="{{newContainer.grid_rows}}" bindinput="onNewInput" data-field="grid_rows" />
+            </view>
+            <view class="form-item flex-1">
+              <view class="form-label">列数 (Cols)：</view>
+              <input class="form-input" type="number" placeholder="如 6" value="{{newContainer.grid_cols}}" bindinput="onNewInput" data-field="grid_cols" />
+            </view>
+          </view>
+          <view class="size-hint-box">
+            💡 抽屉矩阵规格：{{newContainer.grid_rows || 3}} 行 × {{newContainer.grid_cols || 4}} 列，共 {{ (newContainer.grid_rows || 3) * (newContainer.grid_cols || 4) }} 个独立格子
+          </view>
+        </view>
+
+        <!-- Dynamic Size Inputs for BOOK -->
+        <view wx:if="{{newContainer.type === 'book'}}">
+          <view class="form-row-2">
+            <view class="form-item flex-1">
+              <view class="form-label">总页数：</view>
+              <input class="form-input" type="number" placeholder="如 20" value="{{newContainer.total_pages}}" bindinput="onNewInput" data-field="total_pages" />
+            </view>
+            <view class="form-item flex-1">
+              <view class="form-label">每页行数：</view>
+              <input class="form-input" type="number" placeholder="如 12" value="{{newContainer.rows_per_page}}" bindinput="onNewInput" data-field="rows_per_page" />
+            </view>
+          </view>
+          <view class="size-hint-box">
+            💡 样本册规格：{{newContainer.total_pages || 20}} 页 × 每页 {{newContainer.rows_per_page || 12}} 行，共 {{ (newContainer.total_pages || 20) * (newContainer.rows_per_page || 12) }} 个插槽
+          </view>
+        </view>
+      </view>
+
+      <view class="modal-footer">
+        <button class="btn-secondary flex-1" bindtap="closeAddModal">取消</button>
+        <button class="btn-primary flex-1" bindtap="submitCreateContainer">立即创建</button>
+      </view>
     </view>
   </view>
 </view>

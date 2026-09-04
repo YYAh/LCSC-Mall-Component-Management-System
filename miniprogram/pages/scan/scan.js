@@ -10,13 +10,24 @@ Page({
     isAppendedStock: false,
     showCandidatesModal: false,
     candidateList: [],
-    sampleBooks: [],
-    selectedBookIndex: 0,
-    pageOptions: [],
-    selectedPageIndex: 0,
-    rowOptions: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
-    selectedRowIndex: 0,
-    locationPreviewText: '未分配',
+
+    // Pre-Scan Inbound Target Location Data (扫码前预选仓位)
+    containers: [],
+    selectedContainerIndex: 0,
+    currentContainer: null,
+    allocMode: 'auto', // 'auto' (自动顺延空位) | 'manual' (手动选定)
+    targetPage: 1,
+    targetRow: 1,
+    targetCol: 1,
+    targetLocationText: '',
+    targetOccupiedComp: null,
+
+    // Modal picker
+    showPickerModal: false,
+    pickerSlots: [],
+    bookPageOptions: [],
+    bookRowOptions: [],
+
     formData: {
       c_code: '',
       mpn: '',
@@ -30,6 +41,8 @@ Page({
       book_id: '',
       page_no: 1,
       row_no: 1,
+      col_no: 1,
+      location_text: '',
       spec: '',
       image_url: '',
       datasheet_url: '',
@@ -38,8 +51,7 @@ Page({
   },
 
   async onLoad(options) {
-    this.initOptions();
-    await this.loadSampleBooks();
+    await this.loadContainers();
 
     if (options.raw) {
       this.handleParsedRawText(decodeURIComponent(options.raw));
@@ -50,36 +62,226 @@ Page({
   },
 
   onShow() {
-    const pendingRaw = getApp().globalData.pendingScanRaw || wx.getStorageSync('PENDING_SCAN_RAW');
+    // Check if user came from books page with a preselected location
+    const app = getApp();
+    if (app && app.globalData && app.globalData.preselectedContainer) {
+      const p = app.globalData.preselectedContainer;
+      app.globalData.preselectedContainer = null;
+      this.applyExternalPreselection(p);
+      return;
+    }
+
+    const pendingRaw = (app && app.globalData && app.globalData.pendingScanRaw) || wx.getStorageSync('PENDING_SCAN_RAW');
     if (pendingRaw) {
-      getApp().globalData.pendingScanRaw = null;
+      if (app && app.globalData) app.globalData.pendingScanRaw = null;
       wx.removeStorageSync('PENDING_SCAN_RAW');
       this.handleParsedRawText(pendingRaw);
     }
   },
 
-  initOptions() {
-    const pages = [];
-    for (let i = 1; i <= 30; i++) {
-      pages.push(`${i}`);
-    }
-    this.setData({ pageOptions: pages });
-  },
-
-  async loadSampleBooks() {
+  async loadContainers() {
     try {
       const res = await api.getBooks();
       if (res && res.success && res.data.length > 0) {
+        const formatted = res.data.map(b => ({
+          ...b,
+          displayName: (b.type === 'box' ? '📦 ' : '📖 ') + b.name
+        }));
+
+        let selIdx = this.data.selectedContainerIndex;
+        if (selIdx >= formatted.length) selIdx = 0;
+
+        const currentContainer = formatted[selIdx];
         this.setData({
-          sampleBooks: res.data,
-          selectedBookIndex: 0,
-          'formData.book_id': res.data[0].id || res.data[0]._id
+          containers: formatted,
+          selectedContainerIndex: selIdx,
+          currentContainer
         });
-        this.updateLocationPreview();
+
+        await this.updateTargetEmptySlot(currentContainer);
       }
     } catch (err) {
-      console.error('Failed to load sample books:', err);
+      console.error('Failed to load containers:', err);
     }
+  },
+
+  async applyExternalPreselection(p) {
+    await this.loadContainers();
+    const idx = this.data.containers.findIndex(c => String(c.id) === String(p.book_id) || String(c._id) === String(p.book_id) || String(c.code) === String(p.book_code));
+    const container = idx !== -1 ? this.data.containers[idx] : this.data.containers[0];
+
+    this.setData({
+      selectedContainerIndex: idx !== -1 ? idx : 0,
+      currentContainer: container,
+      allocMode: 'manual',
+      targetPage: Number(p.page_no) || 1,
+      targetRow: Number(p.row_no) || 1,
+      targetCol: Number(p.col_no) || 1,
+      targetLocationText: p.location_text,
+      targetOccupiedComp: null
+    });
+
+    wx.showToast({
+      title: `已预选仓位: ${p.location_text}`,
+      icon: 'none'
+    });
+  },
+
+  async onContainerChange(e) {
+    const idx = parseInt(e.detail.value, 10);
+    const container = this.data.containers[idx];
+    this.setData({
+      selectedContainerIndex: idx,
+      currentContainer: container
+    });
+
+    if (this.data.allocMode === 'auto') {
+      await this.updateTargetEmptySlot(container);
+    } else {
+      this.computeManualLocationText(container, this.data.targetPage, this.data.targetRow, this.data.targetCol);
+    }
+  },
+
+  setAllocMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    this.setData({ allocMode: mode });
+    if (mode === 'auto') {
+      this.updateTargetEmptySlot(this.data.currentContainer);
+    } else {
+      this.openSlotPicker();
+    }
+  },
+
+  async updateTargetEmptySlot(container) {
+    if (!container) return;
+    try {
+      const slotRes = await api.getBookNextEmpty(container.id || container._id);
+      if (slotRes && slotRes.success && slotRes.data && !slotRes.data.is_full) {
+        const d = slotRes.data;
+        this.setData({
+          targetPage: Number(d.page_no) || 1,
+          targetRow: Number(d.row_no) || 1,
+          targetCol: Number(d.col_no) || 1,
+          targetLocationText: d.location_text,
+          targetOccupiedComp: null
+        });
+      } else {
+        const isBox = container.type === 'box';
+        const fallbackText = isBox ? `${container.code}-R01-C01` : `${container.code}-P01-R01`;
+        this.setData({
+          targetPage: 1,
+          targetRow: 1,
+          targetCol: 1,
+          targetLocationText: fallbackText,
+          targetOccupiedComp: null
+        });
+      }
+    } catch (e) {
+      console.warn('Find next empty error:', e);
+    }
+  },
+
+  computeManualLocationText(container, page, row, col) {
+    if (!container) return;
+    const isBox = container.type === 'box';
+    const loc = isBox
+      ? `${container.code || 'BOX'}-R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`
+      : `${container.code || 'B01'}-P${String(page).padStart(2, '0')}-R${String(row).padStart(2, '0')}`;
+    this.setData({ targetLocationText: loc });
+  },
+
+  async advanceToNextEmptySlot() {
+    if (this.data.allocMode !== 'auto') return;
+    const container = this.data.currentContainer;
+    if (!container) return;
+
+    try {
+      const slotRes = await api.getBookNextEmpty(container.id || container._id);
+      if (slotRes && slotRes.success && slotRes.data && !slotRes.data.is_full) {
+        const d = slotRes.data;
+        this.setData({
+          targetPage: Number(d.page_no) || 1,
+          targetRow: Number(d.row_no) || 1,
+          targetCol: Number(d.col_no) || 1,
+          targetLocationText: d.location_text,
+          targetOccupiedComp: null
+        });
+      }
+    } catch (e) {}
+  },
+
+  async openSlotPicker() {
+    const container = this.data.currentContainer;
+    if (!container) return;
+
+    if (container.type === 'box') {
+      wx.showLoading({ title: '加载抽屉矩阵...' });
+      try {
+        const res = await api.getBookPage(container.id || container._id, 1);
+        wx.hideLoading();
+        if (res && res.success && res.data) {
+          this.setData({
+            pickerSlots: res.data.slots || [],
+            showPickerModal: true
+          });
+        }
+      } catch (e) {
+        wx.hideLoading();
+      }
+    } else {
+      // Book
+      const pages = [];
+      const totalP = container.total_pages || 20;
+      for (let i = 1; i <= totalP; i++) pages.push(`第 P${i < 10 ? '0' + i : i} 页`);
+
+      const rows = [];
+      const totalR = container.rows_per_page || 12;
+      for (let r = 1; r <= totalR; r++) rows.push(`第 ${r} 行`);
+
+      this.setData({
+        bookPageOptions: pages,
+        bookRowOptions: rows,
+        showPickerModal: true
+      });
+    }
+  },
+
+  closeSlotPicker() {
+    this.setData({ showPickerModal: false });
+  },
+
+  selectGridCell(e) {
+    const row = parseInt(e.currentTarget.dataset.row, 10);
+    const col = parseInt(e.currentTarget.dataset.col, 10);
+    const occupied = e.currentTarget.dataset.occupied || null;
+    const container = this.data.currentContainer;
+
+    const locText = `${container.code || 'BOX'}-R${String(row).padStart(2, '0')}-C${String(col).padStart(2, '0')}`;
+    this.setData({
+      targetRow: row,
+      targetCol: col,
+      targetLocationText: locText,
+      targetOccupiedComp: occupied,
+      allocMode: 'manual',
+      showPickerModal: false
+    });
+
+    wx.showToast({
+      title: `已锁定仓位: ${locText}`,
+      icon: 'none'
+    });
+  },
+
+  onTargetPageChange(e) {
+    const p = parseInt(e.detail.value, 10) + 1;
+    this.setData({ targetPage: p });
+    this.computeManualLocationText(this.data.currentContainer, p, this.data.targetRow, this.data.targetCol);
+  },
+
+  onTargetRowChange(e) {
+    const r = parseInt(e.detail.value, 10) + 1;
+    this.setData({ targetRow: r });
+    this.computeManualLocationText(this.data.currentContainer, this.data.targetPage, r, this.data.targetCol);
   },
 
   startScan() {
@@ -116,6 +318,8 @@ Page({
 
       const comp = res.data.component;
       const inboundQty = Number(comp.inbound_qty) || 10;
+      const targetLoc = this.data.targetLocationText || '待分配';
+      const container = this.data.currentContainer;
 
       // 1. Check if this component already exists in DB
       const existingComp = await api.findExistingComponent(comp.c_code, comp.mpn);
@@ -125,12 +329,13 @@ Page({
 
         wx.showModal({
           title: '⚠️ 该元器件已存在',
-          content: `检测到【${existingComp.name || existingComp.mpn}】已在库中！\n• 立创编号: ${existingComp.c_code || '-'}\n• 当前库存: ${existingComp.stock} ${existingComp.unit || '个'}\n• 存放仓位: [${existingComp.location_text || '未分配'}]\n\n是否直接追加本次入库数量 +${inboundQty} 个？`,
-          confirmText: `追加 +${inboundQty}`,
-          cancelText: '重新编辑',
+          content: `检测到【${existingComp.name || existingComp.mpn}】已在库中！\n• 原仓位: [${existingComp.location_text || '未分配'}] (现有库存: ${existingComp.stock})\n• 扫码前预选新仓位: [${targetLoc}]\n\n请选择如何入库：`,
+          confirmText: `追加原仓位 (+${inboundQty})`,
+          cancelText: `存入预选仓位`,
           confirmColor: '#1890ff',
           success: async (mRes) => {
             if (mRes.confirm) {
+              // Append to old location
               wx.showLoading({ title: '追加入库中...' });
               await api.stockIn({
                 component_id: existingComp.id || existingComp._id,
@@ -144,63 +349,65 @@ Page({
                 autoSavedItem: updated.data,
                 isAppendedStock: true
               });
-              wx.showToast({ title: `已成功追加 +${inboundQty} 个！`, icon: 'success' });
+              wx.showToast({ title: `已追加 +${inboundQty} 个！`, icon: 'success' });
             } else {
-              this.populateFormData(comp);
+              // Save into the preselected location!
+              this.saveNewInboundComponent(comp, inboundQty, container, targetLoc);
             }
           }
         });
         return;
       }
 
-      // 2. New Component: Automatically match book, find empty slot and save
-      let targetBook = this.data.sampleBooks.find(b => b.category && comp.category && (comp.category.includes(b.category) || b.category.includes(comp.category))) || this.data.sampleBooks[0];
-      let targetBookId = targetBook ? (targetBook.id || targetBook._id) : (this.data.sampleBooks[0] && (this.data.sampleBooks[0].id || this.data.sampleBooks[0]._id));
+      // 2. New Component: Save directly into the PRESELECTED LOCATION!
+      await this.saveNewInboundComponent(comp, inboundQty, container, targetLoc);
 
-      const slotRes = await api.getBookNextEmpty(targetBookId);
-      let pageNo = 1;
-      let rowNo = 1;
-      let locText = `${targetBook ? targetBook.code : 'B01'}-P01-R01`;
-
-      if (slotRes && slotRes.success && slotRes.data && !slotRes.data.is_full) {
-        pageNo = slotRes.data.page_no;
-        rowNo = slotRes.data.row_no;
-        locText = slotRes.data.location_text;
-      }
-
-      const newCompData = {
-        c_code: comp.c_code || '',
-        mpn: comp.mpn || '',
-        name: comp.name || comp.mpn || '电子元器件',
-        category: comp.category || '贴片电阻',
-        brand: comp.brand || '国产优质/通用',
-        package_name: comp.package_name || '',
-        stock: inboundQty,
-        safe_stock: 5,
-        unit: '个',
-        book_id: targetBookId,
-        page_no: pageNo,
-        row_no: rowNo,
-        location_text: locText,
-        spec: comp.spec || comp.name || '',
-        image_url: comp.image_url || '',
-        datasheet_url: comp.datasheet_url || '',
-        order_no: comp.order_no || ''
-      };
-
-      const saveRes = await api.createComponent(newCompData);
-
-      if (saveRes && saveRes.success) {
-        try { wx.vibrateShort(); } catch (e) {}
-        this.setData({
-          autoSavedItem: saveRes.data,
-          isAppendedStock: false
-        });
-        wx.showToast({ title: `🎉 入库成功！[${locText}]`, icon: 'success' });
-      }
     } catch (err) {
       wx.hideLoading();
       wx.showToast({ title: err.message || '解析失败', icon: 'none' });
+    }
+  },
+
+  async saveNewInboundComponent(comp, inboundQty, container, targetLoc) {
+    wx.showLoading({ title: `存入预选仓位 [${targetLoc}]...` });
+
+    const newCompData = {
+      c_code: comp.c_code || '',
+      mpn: comp.mpn || '',
+      name: comp.name || comp.mpn || '电子元器件',
+      category: comp.category || (container && container.category) || '贴片器件',
+      brand: comp.brand || '国产优质/通用',
+      package_name: comp.package_name || '',
+      stock: inboundQty,
+      safe_stock: 5,
+      unit: '个',
+      book_id: container ? (container.id || container._id) : '',
+      page_no: this.data.targetPage || 1,
+      row_no: this.data.targetRow || 1,
+      col_no: this.data.targetCol || 1,
+      location_text: targetLoc,
+      spec: comp.spec || comp.name || '',
+      image_url: comp.image_url || '',
+      datasheet_url: comp.datasheet_url || '',
+      order_no: comp.order_no || ''
+    };
+
+    const saveRes = await api.createComponent(newCompData);
+    wx.hideLoading();
+
+    if (saveRes && saveRes.success) {
+      try { wx.vibrateShort(); } catch (e) {}
+      this.setData({
+        autoSavedItem: saveRes.data,
+        isAppendedStock: false
+      });
+
+      wx.showToast({ title: `🎉 入库成功！[${targetLoc}]`, icon: 'success' });
+
+      // Auto advance to next empty slot!
+      if (this.data.allocMode === 'auto') {
+        this.advanceToNextEmptySlot();
+      }
     }
   },
 
@@ -211,7 +418,7 @@ Page({
       'formData.c_code': comp.c_code || '',
       'formData.mpn': comp.mpn || '',
       'formData.name': comp.name || comp.mpn || '',
-      'formData.category': comp.category || '贴片电阻',
+      'formData.category': comp.category || '贴片器件',
       'formData.brand': comp.brand || '国产优质/通用',
       'formData.package_name': comp.package_name || '',
       'formData.stock': comp.inbound_qty || 10,
@@ -221,7 +428,6 @@ Page({
       'formData.datasheet_url': comp.datasheet_url || '',
       inputKeyword: comp.c_code || comp.mpn || ''
     });
-    this.findNextEmptySlot();
   },
 
   onKeywordInput(e) {
@@ -236,7 +442,7 @@ Page({
     }
 
     this.setData({ loading: true });
-    wx.showLoading({ title: '联网检索立创商城库...' });
+    wx.showLoading({ title: '检索立创官方库...' });
     try {
       const candidates = await api.searchJlcCandidates(kw);
       wx.hideLoading();
@@ -244,132 +450,76 @@ Page({
 
       if (candidates && candidates.length === 1) {
         this.populateFormData(candidates[0]);
-        wx.showToast({ title: '已匹配立创官方物料', icon: 'success' });
+        wx.showToast({ title: '已匹配立创物料', icon: 'success' });
       } else if (candidates && candidates.length > 1) {
         this.setData({
           candidateList: candidates,
           showCandidatesModal: true
         });
       } else {
-        // Single fallback
-        const single = await api.searchJlc(kw);
-        if (single && single.data) {
-          this.populateFormData(single.data);
-        }
-        wx.showToast({ title: '未找到对应商品，已填入', icon: 'none' });
+        wx.showToast({ title: '未找到匹配物料', icon: 'none' });
       }
     } catch (err) {
       wx.hideLoading();
       this.setData({ loading: false });
-      wx.showToast({ title: '查询失败: ' + err.message, icon: 'none' });
+      wx.showToast({ title: err.message || '查询失败', icon: 'none' });
     }
   },
 
   selectCandidate(e) {
     const item = e.currentTarget.dataset.item;
     this.populateFormData(item);
-    wx.showToast({ title: '已选取: ' + (item.mpn || item.c_code), icon: 'success' });
   },
 
-  closeCandidateModal() {
+  closeCandidatesModal() {
     this.setData({ showCandidatesModal: false });
   },
 
   onFormInput(e) {
     const field = e.currentTarget.dataset.field;
+    const value = e.detail.value;
     this.setData({
-      [`formData.${field}`]: e.detail.value
+      [`formData.${field}`]: value
     });
   },
 
-  onBookChange(e) {
-    const idx = parseInt(e.detail.value, 10);
-    const book = this.data.sampleBooks[idx];
-    this.setData({
-      selectedBookIndex: idx,
-      'formData.book_id': book ? (book.id || book._id) : ''
-    });
-    this.updateLocationPreview();
-  },
-
-  onPageChange(e) {
-    const idx = parseInt(e.detail.value, 10);
-    const p = parseInt(this.data.pageOptions[idx], 10);
-    this.setData({
-      selectedPageIndex: idx,
-      'formData.page_no': p
-    });
-    this.updateLocationPreview();
-  },
-
-  onRowChange(e) {
-    const idx = parseInt(e.detail.value, 10);
-    const r = parseInt(this.data.rowOptions[idx], 10);
-    this.setData({
-      selectedRowIndex: idx,
-      'formData.row_no': r
-    });
-    this.updateLocationPreview();
-  },
-
-  async findNextEmptySlot() {
-    let bookId = this.data.formData.book_id;
-    const cat = this.data.formData.category;
-    const books = this.data.sampleBooks;
-
-    if (books && books.length > 0) {
-      const targetBook = api.matchBookForCategory(cat, books) || books[0];
-      const targetIdx = books.findIndex(b => (b.id && (b.id === targetBook.id || b._id === targetBook.id)) || b.code === targetBook.code);
-      if (targetIdx !== -1) {
-        bookId = targetBook.id || targetBook._id;
-        this.setData({
-          selectedBookIndex: targetIdx,
-          'formData.book_id': bookId
-        });
-      }
+  async saveComponentForm() {
+    const f = this.data.formData;
+    if (!f.mpn && !f.name) {
+      wx.showToast({ title: '厂家型号或品名必填', icon: 'none' });
+      return;
     }
 
-    if (!bookId) return;
+    const container = this.data.currentContainer;
+    const targetLoc = this.data.targetLocationText || '待分配';
 
-    try {
-      const res = await api.getBookNextEmpty(bookId);
-      if (res && res.success && res.data && !res.data.is_full) {
-        const slot = res.data;
-        const pageIdx = Math.max(0, slot.page_no - 1);
-        const rowIdx = Math.max(0, slot.row_no - 1);
-
-        this.setData({
-          'formData.page_no': slot.page_no,
-          'formData.row_no': slot.row_no,
-          selectedPageIndex: pageIdx,
-          selectedRowIndex: rowIdx
-        });
-        this.updateLocationPreview();
-      }
-    } catch (e) {}
-  },
-
-  updateLocationPreview() {
-    const book = this.data.sampleBooks[this.data.selectedBookIndex];
-    const code = book ? (book.code || book.name) : 'B01';
-    const p = String(this.data.formData.page_no || 1).padStart(2, '0');
-    const r = String(this.data.formData.row_no || 1).padStart(2, '0');
-    const text = `${code}-P${p}-R${r}`;
-    this.setData({ locationPreviewText: text });
-  },
-
-  async manualSaveComponent() {
     this.setData({ saving: true });
-    wx.showLoading({ title: '保存中...' });
+    wx.showLoading({ title: '保存入库中...' });
+
     try {
-      const payload = {
-        ...this.data.formData,
-        location_text: this.data.locationPreviewText
-      };
-      const res = await api.createComponent(payload);
+      const saveRes = await api.createComponent({
+        ...f,
+        book_id: container ? (container.id || container._id) : '',
+        page_no: this.data.targetPage || 1,
+        row_no: this.data.targetRow || 1,
+        col_no: this.data.targetCol || 1,
+        location_text: targetLoc
+      });
+
       wx.hideLoading();
-      this.setData({ saving: false, autoSavedItem: res.data, isAppendedStock: false });
-      wx.showToast({ title: '入库成功！', icon: 'success' });
+      this.setData({ saving: false });
+
+      if (saveRes && saveRes.success) {
+        this.setData({
+          autoSavedItem: saveRes.data,
+          formData: { c_code: '', mpn: '', name: '', stock: 10 }
+        });
+        wx.showToast({ title: `入库成功 [${targetLoc}]`, icon: 'success' });
+
+        if (this.data.allocMode === 'auto') {
+          this.advanceToNextEmptySlot();
+        }
+      }
     } catch (err) {
       wx.hideLoading();
       this.setData({ saving: false });
@@ -377,19 +527,25 @@ Page({
     }
   },
 
+  resetForm() {
+    this.setData({
+      formData: { c_code: '', mpn: '', name: '' }
+    });
+  },
+
   goToPrintSaved() {
-    if (this.data.autoSavedItem) {
-      wx.navigateTo({
-        url: `/pages/print/print?id=${this.data.autoSavedItem.id || this.data.autoSavedItem._id}`
-      });
-    }
+    const item = this.data.autoSavedItem;
+    if (!item) return;
+    wx.navigateTo({
+      url: `/pages/print/print?id=${item.id || item._id}`
+    });
   },
 
   goToDetailSaved() {
-    if (this.data.autoSavedItem) {
-      wx.navigateTo({
-        url: `/pages/detail/detail?id=${this.data.autoSavedItem.id || this.data.autoSavedItem._id}`
-      });
-    }
+    const item = this.data.autoSavedItem;
+    if (!item) return;
+    wx.navigateTo({
+      url: `/pages/detail/detail?id=${item.id || item._id}`
+    });
   }
 });

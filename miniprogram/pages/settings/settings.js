@@ -1,6 +1,5 @@
 // pages/settings/settings.js
 const api = require('../../utils/api');
-const onlineSync = require('../../utils/onlineSync');
 
 Page({
   data: {
@@ -8,30 +7,13 @@ Page({
     serverUrl: 'http://127.0.0.1:3000',
     testingServer: false,
     seeding: false,
-    savedBle: null,
-
-    // Online Sync
-    syncEnabled: false,
-    syncMode: 'feishu_bitable_api',
-    webhookUrl: '',
-    feishuAppId: '',
-    feishuAppSecret: '',
-    feishuAppToken: 'YXgxbYlJSatOnvsQzDNcW7JQnng',
-    testingSync: false,
-    pushingAll: false
+    savedBle: null
   },
 
   onShow() {
-    const syncCfg = onlineSync.getSyncConfig();
     this.setData({
       engineMode: api.getEngineMode(),
-      serverUrl: api.getServerUrl(),
-      syncEnabled: syncCfg.enabled,
-      syncMode: syncCfg.syncMode || 'feishu_bitable_api',
-      webhookUrl: syncCfg.webhookUrl,
-      feishuAppId: syncCfg.feishuAppId,
-      feishuAppSecret: syncCfg.feishuAppSecret,
-      feishuAppToken: syncCfg.feishuAppToken || 'YXgxbYlJSatOnvsQzDNcW7JQnng'
+      serverUrl: api.getServerUrl()
     });
     this.loadSavedBle();
   },
@@ -61,7 +43,7 @@ Page({
       if (res && res.success) {
         wx.showModal({
           title: '✅ 局域网服务器连接成功！',
-          content: `已成功连接到后端服务 (${cleanUrl})！\n• 库中元器件数: ${res.data.total_components} 种\n• 总库存: ${res.data.total_stock} 个\n• 样品册: ${res.data.total_books} 本`,
+          content: `已成功连接到后端服务 (${cleanUrl})！\n• 库中元器件数: ${res.data.total_components} 种\n• 总库存: ${res.data.total_stock} 个\n• 样品册与元件盒: ${res.data.total_books} 个`,
           showCancel: false
         });
       }
@@ -71,130 +53,6 @@ Page({
       wx.showModal({
         title: '连接失败',
         content: `无法连接到 ${cleanUrl}\n\n请检查：\n1. 电脑是否双击运行了【启动后端服务.bat】？\n2. 手机和电脑是否连接在同一个 WiFi 局域网下？\n3. 填写的 IP 是否是电脑的局域网 IP（如 192.168.x.x）？`,
-        showCancel: false
-      });
-    }
-  },
-
-  // Online Sync Handlers
-  onSyncSwitchChange(e) {
-    const enabled = e.detail.value;
-    onlineSync.saveSyncConfig({ enabled });
-    this.setData({ syncEnabled: enabled });
-    wx.showToast({
-      title: enabled ? '已开启在线表格同步' : '已关闭在线表格同步',
-      icon: 'none'
-    });
-  },
-
-  changeSyncMode(e) {
-    const mode = e.currentTarget.dataset.mode;
-    onlineSync.saveSyncConfig({ syncMode: mode });
-    this.setData({ syncMode: mode });
-  },
-
-  onWebhookUrlInput(e) {
-    const url = e.detail.value;
-    onlineSync.saveSyncConfig({ webhookUrl: url });
-    this.setData({ webhookUrl: url });
-  },
-
-  onFeishuAppTokenInput(e) {
-    const val = e.detail.value;
-    onlineSync.saveSyncConfig({ feishuAppToken: val });
-    this.setData({ feishuAppToken: val });
-  },
-
-  onFeishuAppIdInput(e) {
-    const val = e.detail.value;
-    onlineSync.saveSyncConfig({ feishuAppId: val });
-    this.setData({ feishuAppId: val });
-  },
-
-  onFeishuAppSecretInput(e) {
-    const val = e.detail.value;
-    onlineSync.saveSyncConfig({ feishuAppSecret: val });
-    this.setData({ feishuAppSecret: val });
-  },
-
-  async testSyncConnection() {
-    onlineSync.saveSyncConfig({
-      syncMode: this.data.syncMode,
-      feishuAppId: this.data.feishuAppId,
-      feishuAppSecret: this.data.feishuAppSecret,
-      feishuAppToken: this.data.feishuAppToken,
-      webhookUrl: this.data.webhookUrl
-    });
-
-    this.setData({ testingSync: true });
-    wx.showLoading({ title: '测试飞书连接...' });
-
-    try {
-      const res = await onlineSync.testSyncConnection();
-      wx.hideLoading();
-      this.setData({ testingSync: false });
-      if (this.data.syncMode === 'feishu_bitable_api') {
-        wx.showModal({
-          title: '🎉 飞书多维表格连接成功！',
-          content: `已成功连接到多维表格！\n• 数据表 ID: ${res.tableId || '默认数据表'}\n• 模式: 100% 免费数据行直接写入\n\n后续每次扫码入库、领料出库都会自动更新多维表格中对应的行数据！`,
-          showCancel: false
-        });
-      } else {
-        wx.showModal({
-          title: '🎉 Webhook 连接成功！',
-          content: '已成功发送测试数据包到 Webhook！',
-          showCancel: false
-        });
-      }
-    } catch (err) {
-      wx.hideLoading();
-      this.setData({ testingSync: false });
-      wx.showModal({
-        title: '连接测试失败',
-        content: err.message || '请检查凭证是否正确或网络连接',
-        showCancel: false
-      });
-    }
-  },
-
-  async pushAllToOnlineSheet() {
-    onlineSync.saveSyncConfig({
-      enabled: true,
-      syncMode: this.data.syncMode,
-      feishuAppId: this.data.feishuAppId,
-      feishuAppSecret: this.data.feishuAppSecret,
-      feishuAppToken: this.data.feishuAppToken,
-      webhookUrl: this.data.webhookUrl
-    });
-    this.setData({ syncEnabled: true, pushingAll: true });
-
-    wx.showLoading({ title: '读取库中全部物料...' });
-    try {
-      const res = await api.getComponents();
-      const list = (res.data && res.data.list) || [];
-      if (list.length === 0) {
-        wx.hideLoading();
-        this.setData({ pushingAll: false });
-        wx.showToast({ title: '库中暂无元器件物料', icon: 'none' });
-        return;
-      }
-
-      wx.showLoading({ title: `正在写入 ${list.length} 种物料到多维表格...` });
-      const syncRes = await onlineSync.syncAllComponents(list);
-
-      wx.hideLoading();
-      this.setData({ pushingAll: false });
-      wx.showModal({
-        title: '✅ 全量同步成功！',
-        content: `已成功将库中现有的 ${syncRes.count || list.length} 种元器件完整写入飞书多维表格（图 1 样式）！`,
-        showCancel: false
-      });
-    } catch (err) {
-      wx.hideLoading();
-      this.setData({ pushingAll: false });
-      wx.showModal({
-        title: '同步失败',
-        content: err.message || '网络连接超时',
         showCancel: false
       });
     }
@@ -283,9 +141,10 @@ Page({
           spec: 'SMD,P=2.54mm 拨码开关',
           stock: 20,
           safe_stock: 5,
-          location_text: 'B05-P01-R02',
+          location_text: 'BOX01-R01-C01',
           page_no: 1,
-          row_no: 2
+          row_no: 1,
+          col_no: 1
         }
       ];
 
@@ -297,7 +156,7 @@ Page({
       this.setData({ seeding: false });
       wx.showModal({
         title: '示例数据写入成功',
-        content: `成功写入 ${demoList.length} 个标准物料（含阻值、品牌与插槽绑定）！\n可前往【物料库】与【样品册】查看体验。`,
+        content: `成功写入 ${demoList.length} 个标准物料（含阻值、品牌与插槽绑定）！\n可前往【物料库】与【仓位容器】查看体验。`,
         showCancel: false
       });
     } catch (e) {
