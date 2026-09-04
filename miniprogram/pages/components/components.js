@@ -112,10 +112,45 @@ Page({
           list: listWithSelection,
           totalCount: res.data.total
         });
+
+        // Silently backfill images for existing components without thumbnails
+        this.backfillMissingImages(listWithSelection);
       }
     } catch (err) {
       this.setData({ loading: false });
       wx.showToast({ title: '加载失败: ' + err.message, icon: 'none' });
+    }
+  },
+
+  async backfillMissingImages(list) {
+    if (!list || list.length === 0 || this._isBackfilling) return;
+    const missing = list.filter(c => (!c.image_url || c.image_url.length < 5) && (c.c_code || c.mpn));
+    if (missing.length === 0) return;
+
+    this._isBackfilling = true;
+    let hasUpdated = false;
+
+    // Fetch in small background batches (up to 8 items) to keep UI responsive
+    const targets = missing.slice(0, 8);
+    for (const item of targets) {
+      try {
+        const detail = await api.searchJlcProductDetail(item.c_code || item.mpn);
+        if (detail && detail.image_url) {
+          await api.updateComponent(item.id || item._id, {
+            image_url: detail.image_url,
+            package_name: item.package_name || detail.package_name || '',
+            brand: item.brand || detail.brand || '',
+            spec: (!item.spec || item.spec === item.mpn) ? (detail.spec || item.spec) : item.spec
+          });
+          item.image_url = detail.image_url;
+          hasUpdated = true;
+        }
+      } catch (e) {}
+    }
+
+    this._isBackfilling = false;
+    if (hasUpdated) {
+      this.setData({ list: [...this.data.list] });
     }
   },
 
@@ -671,9 +706,32 @@ Page({
     if (!items || items.length === 0) return;
 
     this.setData({ importing: true });
-    wx.showLoading({ title: '正在规划入库...' });
+    wx.showLoading({ title: '正在匹配立创图片...' });
 
     try {
+      // 1. Enrich items with official JLC thumbnails & specs
+      for (let i = 0; i < items.length; i += 5) {
+        const chunk = items.slice(i, i + 5);
+        if (items.length > 5) {
+          wx.showLoading({ title: `匹配立创图片 (${Math.min(i + 5, items.length)}/${items.length})...` });
+        }
+        await Promise.all(chunk.map(async (item) => {
+          if (!item.image_url && (item.c_code || item.mpn)) {
+            try {
+              const detail = await api.searchJlcProductDetail(item.c_code || item.mpn);
+              if (detail && detail.image_url) {
+                item.image_url = detail.image_url;
+                if (!item.package_name && detail.package_name) item.package_name = detail.package_name;
+                if (!item.brand && detail.brand) item.brand = detail.brand;
+                if ((!item.spec || item.spec === item.mpn) && detail.spec) item.spec = detail.spec;
+              }
+            } catch (e) {}
+          }
+        }));
+      }
+
+      wx.showLoading({ title: '正在规划入库...' });
+
       if (mode === 'new_box') {
         const rows = Math.max(1, Number(gridRows) || 4);
         const cols = Math.max(1, Number(gridCols) || 6);

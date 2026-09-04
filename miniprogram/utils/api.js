@@ -306,30 +306,59 @@ const api = {
 
     // Local parser with smart classification & offline resistor/capacitor decoding
     const parsed = qrParser.parseJlcQrCode(text);
-    if (!parsed) throw new Error('无法解析的二维码格式');
+    if (!parsed) throw new Error('无法解析的条码格式');
+
+    // Prefer cCode, then mpn for official lookup
     const queryKw = parsed.cCode || parsed.mpn;
-    let comp = queryKw ? await queryEasyEdaDirect(queryKw) : null;
+    let comp = null;
+
+    if (queryKw) {
+      try {
+        comp = await queryEasyEdaDirect(queryKw);
+      } catch (e) {}
+    }
+
+    // If cCode didn't return a match, try mpn
+    if (!comp && parsed.mpn && parsed.mpn !== queryKw) {
+      try {
+        comp = await queryEasyEdaDirect(parsed.mpn);
+      } catch (e) {}
+    }
 
     if (!comp) {
-      const fallbackRaw = {
-        c_code: parsed.cCode,
-        mpn: parsed.mpn,
-        name: parsed.mpn,
-        category: '',
-        brand: '',
-        package_name: '',
-        inbound_qty: parsed.qty || 10,
-        order_no: parsed.orderNo || ''
-      };
-      const cl = classifyComponent(fallbackRaw);
-      comp = {
-        ...fallbackRaw,
-        category: cl.category,
-        package_name: cl.package_name,
-        spec: cl.spec,
-        brand: cl.brand
-      };
+      // Check if we have this component in local DB already!
+      const localExisting = await this.findExistingComponent(parsed.cCode, parsed.mpn);
+      if (localExisting) {
+        comp = {
+          ...localExisting,
+          inbound_qty: parsed.qty || localExisting.stock || 10,
+          order_no: parsed.orderNo || localExisting.order_no || ''
+        };
+      } else {
+        const fallbackRaw = {
+          c_code: parsed.cCode || '',
+          mpn: parsed.mpn || parsed.cCode || '电子元器件',
+          name: parsed.mpn || parsed.cCode || '电子元器件',
+          category: '',
+          brand: '',
+          package_name: '',
+          image_url: '',
+          inbound_qty: parsed.qty || 10,
+          order_no: parsed.orderNo || ''
+        };
+        const cl = classifyComponent(fallbackRaw);
+        comp = {
+          ...fallbackRaw,
+          category: cl.category || '常用电子器件',
+          package_name: cl.package_name || '',
+          spec: cl.spec || fallbackRaw.mpn,
+          brand: cl.brand || '国产优质/通用'
+        };
+      }
     }
+
+    const finalCCode = parsed.cCode || comp.c_code || '';
+    const finalMpn = comp.mpn || parsed.mpn || finalCCode || '电子元器件';
 
     return {
       success: true,
@@ -337,10 +366,10 @@ const api = {
         qrInfo: parsed,
         component: {
           ...comp,
-          c_code: parsed.cCode || comp.c_code,
-          mpn: comp.mpn || parsed.mpn,
+          c_code: finalCCode,
+          mpn: finalMpn,
           inbound_qty: parsed.qty || comp.inbound_qty || 10,
-          order_no: parsed.orderNo || ''
+          order_no: parsed.orderNo || comp.order_no || ''
         }
       }
     };
@@ -530,16 +559,35 @@ const api = {
   async findExistingComponent(cCode, mpn) {
     const res = await this.getComponents();
     const list = (res.data && res.data.list) || [];
-    const cleanC = cCode ? cCode.trim().toUpperCase() : '';
-    const cleanMpn = mpn ? mpn.trim().toUpperCase() : '';
+    const cleanC = cCode ? String(cCode).trim().toUpperCase() : '';
+    const cleanMpn = mpn ? String(mpn).trim().toUpperCase() : '';
+    const pureC = cleanC.replace(/^C/i, '');
 
     return list.find(c => {
       const itemC = (c.c_code || '').trim().toUpperCase();
       const itemMpn = (c.mpn || '').trim().toUpperCase();
-      if (cleanC && itemC && itemC === cleanC) return true;
-      if (cleanMpn && itemMpn && itemMpn === cleanMpn) return true;
+      const pureItemC = itemC.replace(/^C/i, '');
+
+      // 1. Direct C-code match (with or without 'C' prefix)
+      if (cleanC && itemC && cleanC === itemC) return true;
+      if (pureC && pureItemC && pureC === pureItemC) return true;
+
+      // 2. Direct MPN match
+      if (cleanMpn && itemMpn && cleanMpn === itemMpn) return true;
+
+      // 3. Cross match (in case user stored c_code in mpn or vice-versa)
+      if (cleanC && itemMpn && cleanC === itemMpn) return true;
+      if (cleanMpn && itemC && cleanMpn === itemC) return true;
+
       return false;
     }) || null;
+  },
+
+  // Search single component detail from EasyEDA (returns official imageUrl, etc.)
+  async searchJlcProductDetail(keyword) {
+    const kw = (keyword || '').trim();
+    if (!kw) return null;
+    return await queryEasyEdaDirect(kw);
   },
 
   // Get Component Categories Summary
@@ -649,12 +697,25 @@ const api = {
       }
     }
 
+    let imageUrl = data.image_url || '';
+    if (!imageUrl && (data.c_code || data.mpn)) {
+      const comps = LocalStorage._get('LOCAL_COMPS', []);
+      const matchInComps = comps.find(c => c.image_url && (
+        (data.c_code && c.c_code && c.c_code.toUpperCase() === data.c_code.toUpperCase()) ||
+        (data.mpn && c.mpn && c.mpn.toUpperCase() === data.mpn.toUpperCase())
+      ));
+      if (matchInComps && matchInComps.image_url) {
+        imageUrl = matchInComps.image_url;
+      }
+    }
+
     const item = {
       ...data,
       category: cl.category || data.category || '常用电子器件',
       package_name: cl.package_name || data.package_name || '',
       spec: cl.spec || data.spec || data.name || '',
       brand: cl.brand || data.brand || '国产优质/通用',
+      image_url: imageUrl,
       book_id: bookId || '',
       page_no: pageNo,
       row_no: rowNo,

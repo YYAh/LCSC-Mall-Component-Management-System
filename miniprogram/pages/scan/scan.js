@@ -313,8 +313,12 @@ Page({
       const res = await api.parseJlcQr(rawText);
       wx.hideLoading();
 
-      if (!res || !res.success || !res.data.component) {
-        wx.showToast({ title: '无法解析二维码', icon: 'none' });
+      if (!res || !res.success || !res.data || !res.data.component) {
+        wx.showModal({
+          title: '扫码提示',
+          content: '未识别到元器件信息。您可以直接在下方输入框中输入立创编号（如 C12345）进行查询入库！',
+          showCancel: false
+        });
         return;
       }
 
@@ -323,38 +327,56 @@ Page({
       const targetLoc = this.data.targetLocationText || '待分配';
       const container = this.data.currentContainer;
 
+      // Ensure valid identification exists
+      if (!comp.c_code && !comp.mpn) {
+        wx.showModal({
+          title: '识别结果不明确',
+          content: '未能提取到有效的立创编号或型号。建议对准包装袋上的二维码或条形码重试，或直接在下方输入 C编号！',
+          showCancel: false
+        });
+        return;
+      }
+
       // 1. Check if this component already exists in DB
       const existingComp = await api.findExistingComponent(comp.c_code, comp.mpn);
 
       if (existingComp) {
         try { wx.vibrateShort(); } catch (e) {}
 
+        const oldLoc = existingComp.location_text || '未分配';
+        const oldStock = existingComp.stock || 0;
+        const compName = existingComp.name || existingComp.mpn || existingComp.c_code;
+
         wx.showModal({
-          title: '⚠️ 该元器件已存在',
-          content: `检测到【${existingComp.name || existingComp.mpn}】已在库中！\n• 原仓位: [${existingComp.location_text || '未分配'}] (现有库存: ${existingComp.stock})\n• 扫码前预选新仓位: [${targetLoc}]\n\n请选择如何入库：`,
-          confirmText: `追加原仓位 (+${inboundQty})`,
+          title: '⚠️ 该元器件已在库',
+          content: `检测到【${compName}】已在库中！\n\n• 原存放仓位: [${oldLoc}] (现有库存: ${oldStock})\n• 扫码前预选新仓位: [${targetLoc}]\n\n请选择入库方式：`,
+          confirmText: `追加原仓位(+${inboundQty})`,
           cancelText: `存入预选仓位`,
           confirmColor: '#1890ff',
           success: async (mRes) => {
             if (mRes.confirm) {
-              // Append to old location
               wx.showLoading({ title: '追加入库中...' });
-              await api.stockIn({
-                component_id: existingComp.id || existingComp._id,
-                qty: inboundQty,
-                order_no: comp.order_no || '',
-                remark: '扫码追加入库'
-              });
-              const updated = await api.getComponentDetail(existingComp.id || existingComp._id);
-              wx.hideLoading();
-              this.setData({
-                autoSavedItem: updated.data,
-                isAppendedStock: true
-              });
-              wx.showToast({ title: `已追加 +${inboundQty} 个！`, icon: 'success' });
+              try {
+                await api.stockIn({
+                  component_id: existingComp.id || existingComp._id,
+                  qty: inboundQty,
+                  order_no: comp.order_no || '',
+                  remark: '扫码追加入库'
+                });
+                const updated = await api.getComponentDetail(existingComp.id || existingComp._id);
+                wx.hideLoading();
+                this.setData({
+                  autoSavedItem: updated.data,
+                  isAppendedStock: true
+                });
+                wx.showToast({ title: `已追加 +${inboundQty} 个！`, icon: 'success' });
+              } catch (stockErr) {
+                wx.hideLoading();
+                wx.showToast({ title: '追加失败: ' + stockErr.message, icon: 'none' });
+              }
             } else {
               // Save into the preselected location!
-              this.saveNewInboundComponent(comp, inboundQty, container, targetLoc);
+              await this.saveNewInboundComponent(comp, inboundQty, container, targetLoc);
             }
           }
         });
@@ -366,7 +388,11 @@ Page({
 
     } catch (err) {
       wx.hideLoading();
-      wx.showToast({ title: err.message || '解析失败', icon: 'none' });
+      wx.showModal({
+        title: '条码解析提示',
+        content: (err.message || '二维码解析异常') + '\n\n您也可以直接在下方输入框输入立创编号（如 C12345）一键查库入库！',
+        showCancel: false
+      });
     }
   },
 
