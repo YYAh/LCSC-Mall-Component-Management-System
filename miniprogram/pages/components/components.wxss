@@ -216,6 +216,42 @@
   color: #bfbfbf;
 }
 
+/* Card Main Body Layout */
+.card-main-body {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-bottom: 12rpx;
+}
+
+.comp-card-thumb {
+  width: 130rpx;
+  height: 130rpx;
+  min-width: 130rpx;
+  max-width: 130rpx;
+  border-radius: 12rpx;
+  background: #f8f9fa;
+  border: 1px solid #ebedf0;
+  box-sizing: border-box;
+}
+
+.placeholder-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f5ff;
+  border: 1px dashed #adc6ff;
+}
+
+.thumb-icon {
+  font-size: 52rpx;
+}
+
+.comp-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Title & Stock Row */
 .card-title-row {
   display: flex;
@@ -225,10 +261,15 @@
 }
 
 .mpn-title {
-  font-size: 34rpx;
+  font-size: 32rpx;
   font-weight: 800;
   color: #1a1a1a;
   letter-spacing: 0.5rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  margin-right: 12rpx;
 }
 
 .stock-title-box {
@@ -594,4 +635,245 @@
   border-radius: 40rpx !important;
   padding: 16rpx 40rpx !important;
   font-size: 26rpx !important;
+}
+
+/* Excel Batch Import Planning Modal Styles */
+.plan-modal-content {
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-form-scroll {
+  max-height: 60vh;
+}
+
+/* Stat Banner Card */
+.plan-stat-card {
+  display: flex;
+  background: #f8f9fa;
+  border-radius: 16rpx;
+  padding: 20rpx 10rpx;
+  margin-bottom: 20rpx;
+  align-items: center;
+  border: 1px solid #e8e8e8;
+}
+
+.plan-stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-num {
+  font-size: 38rpx;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.stat-blue { color: #1890ff; }
+.stat-green { color: #52c41a; }
+.stat-red { color: #f5222d; }
+
+.stat-label {
+  font-size: 22rpx;
+  color: #8c8c8c;
+  margin-top: 6rpx;
+}
+
+.plan-stat-divider {
+  width: 1px;
+  height: 48rpx;
+  background: #d9d9d9;
+}
+
+/* Alert Boxes */
+.plan-alert-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.4;
+  margin-bottom: 20rpx;
+}
+
+.alert-danger {
+  background: #fff1f0;
+  border: 1px solid #ffa39e;
+  color: #cf1322;
+}
+
+.alert-success {
+  background: #f6ffed;
+  border: 1px solid #b7eb8f;
+  color: #389e0d;
+}
+
+.alert-icon {
+  font-size: 28rpx;
+}
+
+.alert-text {
+  flex: 1;
+}
+
+/* Mode Selector Tabs */
+.plan-mode-tabs {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+}
+
+.plan-mode-tab {
+  flex: 1;
+  background: #f5f5f5;
+  border: 1.5px solid #d9d9d9;
+  border-radius: 16rpx;
+  padding: 16rpx 8rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.plan-mode-tab.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.mode-tab-icon {
+  font-size: 36rpx;
+  margin-bottom: 4rpx;
+}
+
+.mode-tab-title {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #262626;
+}
+
+.plan-mode-tab.active .mode-tab-title {
+  color: #1890ff;
+}
+
+.mode-tab-sub {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  margin-top: 2rpx;
+}
+
+/* Settings Box */
+.plan-settings-box {
+  background: #fafafa;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  border: 1px solid #f0f0f0;
+  margin-bottom: 20rpx;
+}
+
+.settings-sec-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1f1f1f;
+  margin-bottom: 16rpx;
+}
+
+/* Matrix Row */
+.plan-matrix-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 16rpx 0;
+}
+
+.matrix-input-group {
+  flex: 1;
+  background: #ffffff;
+  border: 1px solid #d9d9d9;
+  border-radius: 12rpx;
+  padding: 12rpx 16rpx;
+}
+
+.matrix-label {
+  font-size: 20rpx;
+  color: #8c8c8c;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.matrix-input {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: #1890ff;
+  height: 50rpx;
+}
+
+.matrix-x {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #bfbfbf;
+}
+
+/* Capacity summary text */
+.plan-capacity-summary {
+  font-size: 24rpx;
+  color: #595959;
+  padding: 10rpx 0;
+  line-height: 1.4;
+}
+
+/* Existing Books List */
+.existing-books-list {
+  max-height: 240rpx;
+  overflow-y: auto;
+  border: 1px solid #e8e8e8;
+  border-radius: 12rpx;
+  background: #ffffff;
+  margin-bottom: 14rpx;
+}
+
+.existing-book-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14rpx 18rpx;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 24rpx;
+}
+
+.existing-book-row:last-child {
+  border-bottom: none;
+}
+
+.ex-book-name {
+  color: #262626;
+  font-weight: 500;
+}
+
+.ex-book-badge {
+  font-size: 20rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 10rpx;
+  font-weight: 600;
+}
+
+.badge-green {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+}
+
+.badge-gray {
+  background: #f5f5f5;
+  color: #bfbfbf;
+  border: 1px solid #d9d9d9;
+}
+
+.plan-notice {
+  font-size: 22rpx;
+  line-height: 1.4;
 }

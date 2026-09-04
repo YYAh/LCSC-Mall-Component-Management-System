@@ -166,13 +166,11 @@ Page({
           targetOccupiedComp: null
         });
       } else {
-        const isBox = container.type === 'box';
-        const fallbackText = isBox ? `${container.code}-R01-C01` : `${container.code}-P01-R01`;
         this.setData({
           targetPage: 1,
           targetRow: 1,
           targetCol: 1,
-          targetLocationText: fallbackText,
+          targetLocationText: '⚠️ 已存满 (请新建/换容器)',
           targetOccupiedComp: null
         });
       }
@@ -205,6 +203,10 @@ Page({
           targetCol: Number(d.col_no) || 1,
           targetLocationText: d.location_text,
           targetOccupiedComp: null
+        });
+      } else {
+        this.setData({
+          targetLocationText: '⚠️ 已存满 (请新建/换容器)'
         });
       }
     } catch (e) {}
@@ -369,7 +371,31 @@ Page({
   },
 
   async saveNewInboundComponent(comp, inboundQty, container, targetLoc) {
-    wx.showLoading({ title: `存入预选仓位 [${targetLoc}]...` });
+    if (!container) {
+      wx.showToast({ title: '请先选择容器', icon: 'none' });
+      return;
+    }
+
+    // Capacity check: if current container is full, intercept and prompt user!
+    const slotRes = await api.getBookNextEmpty(container.id || container._id);
+    if (slotRes && slotRes.data && slotRes.data.is_full) {
+      this.promptFullContainerCreate(comp, inboundQty, container, false);
+      return;
+    }
+
+    let finalLoc = targetLoc;
+    let pageNo = this.data.targetPage || 1;
+    let rowNo = this.data.targetRow || 1;
+    let colNo = this.data.targetCol || 1;
+
+    if (this.data.allocMode === 'auto' && slotRes && slotRes.success && slotRes.data) {
+      finalLoc = slotRes.data.location_text || targetLoc;
+      pageNo = slotRes.data.page_no || pageNo;
+      rowNo = slotRes.data.row_no || rowNo;
+      colNo = slotRes.data.col_no || colNo;
+    }
+
+    wx.showLoading({ title: `存入预选仓位 [${finalLoc}]...` });
 
     const newCompData = {
       c_code: comp.c_code || '',
@@ -382,10 +408,10 @@ Page({
       safe_stock: 5,
       unit: '个',
       book_id: container ? (container.id || container._id) : '',
-      page_no: this.data.targetPage || 1,
-      row_no: this.data.targetRow || 1,
-      col_no: this.data.targetCol || 1,
-      location_text: targetLoc,
+      page_no: pageNo,
+      row_no: rowNo,
+      col_no: colNo,
+      location_text: finalLoc,
       spec: comp.spec || comp.name || '',
       image_url: comp.image_url || '',
       datasheet_url: comp.datasheet_url || '',
@@ -402,12 +428,13 @@ Page({
         isAppendedStock: false
       });
 
-      wx.showToast({ title: `🎉 入库成功！[${targetLoc}]`, icon: 'success' });
+      wx.showToast({ title: `🎉 入库成功！[${finalLoc}]`, icon: 'success' });
 
       // Auto advance to next empty slot!
       if (this.data.allocMode === 'auto') {
         this.advanceToNextEmptySlot();
       }
+      this.loadContainers();
     }
   },
 
@@ -491,7 +518,29 @@ Page({
     }
 
     const container = this.data.currentContainer;
-    const targetLoc = this.data.targetLocationText || '待分配';
+    if (!container) {
+      wx.showToast({ title: '请先选择容器', icon: 'none' });
+      return;
+    }
+
+    // Capacity Check
+    const slotRes = await api.getBookNextEmpty(container.id || container._id);
+    if (slotRes && slotRes.data && slotRes.data.is_full) {
+      this.promptFullContainerCreate(f, f.stock || 10, container, true);
+      return;
+    }
+
+    let finalLoc = this.data.targetLocationText || '待分配';
+    let pageNo = this.data.targetPage || 1;
+    let rowNo = this.data.targetRow || 1;
+    let colNo = this.data.targetCol || 1;
+
+    if (this.data.allocMode === 'auto' && slotRes && slotRes.success && slotRes.data) {
+      finalLoc = slotRes.data.location_text || finalLoc;
+      pageNo = slotRes.data.page_no || pageNo;
+      rowNo = slotRes.data.row_no || rowNo;
+      colNo = slotRes.data.col_no || colNo;
+    }
 
     this.setData({ saving: true });
     wx.showLoading({ title: '保存入库中...' });
@@ -500,10 +549,10 @@ Page({
       const saveRes = await api.createComponent({
         ...f,
         book_id: container ? (container.id || container._id) : '',
-        page_no: this.data.targetPage || 1,
-        row_no: this.data.targetRow || 1,
-        col_no: this.data.targetCol || 1,
-        location_text: targetLoc
+        page_no: pageNo,
+        row_no: rowNo,
+        col_no: colNo,
+        location_text: finalLoc
       });
 
       wx.hideLoading();
@@ -514,17 +563,133 @@ Page({
           autoSavedItem: saveRes.data,
           formData: { c_code: '', mpn: '', name: '', stock: 10 }
         });
-        wx.showToast({ title: `入库成功 [${targetLoc}]`, icon: 'success' });
+        wx.showToast({ title: `入库成功 [${finalLoc}]`, icon: 'success' });
 
         if (this.data.allocMode === 'auto') {
           this.advanceToNextEmptySlot();
         }
+        this.loadContainers();
       }
     } catch (err) {
       wx.hideLoading();
       this.setData({ saving: false });
       wx.showToast({ title: err.message || '保存失败', icon: 'none' });
     }
+  },
+
+  promptFullContainerCreate(itemData, inboundQty, container, isManualForm) {
+    const typeText = container.type === 'box' ? '元件盒' : '样本册';
+    wx.showModal({
+      title: '⚠️ 当前容器已存满！',
+      content: `您当前选中的【${container.name}】(${typeText}) 所有储位已全部用完！\n\n是否立即新建下一个${typeText}继续入库？`,
+      confirmText: '立即新建',
+      cancelText: '换其他容器',
+      confirmColor: '#1890ff',
+      success: async (mRes) => {
+        if (mRes.confirm) {
+          await this.createNextContainerAndInbound(itemData, inboundQty, container, isManualForm);
+        } else {
+          wx.showToast({ title: '请在上方切换有余量的容器', icon: 'none' });
+        }
+      }
+    });
+  },
+
+  async createNextContainerAndInbound(itemData, inboundQty, oldContainer, isManualForm) {
+    wx.showLoading({ title: '正在新建容器...' });
+    try {
+      const nextNum = this.data.containers.length + 1;
+      const isBox = oldContainer.type === 'box';
+      const newContainerData = {
+        name: isBox ? `${nextNum}号 ${oldContainer.grid_rows || 4}×${oldContainer.grid_cols || 6} 元件盒` : `${nextNum}号 元件样品册`,
+        code: isBox ? `BOX0${nextNum}` : `B0${nextNum}`,
+        type: oldContainer.type || 'box',
+        category: oldContainer.category || '常用元器件',
+        grid_rows: Number(oldContainer.grid_rows) || 4,
+        grid_cols: Number(oldContainer.grid_cols) || 6,
+        total_pages: Number(oldContainer.total_pages) || 20,
+        rows_per_page: Number(oldContainer.rows_per_page) || 12
+      };
+
+      const createRes = await api.createBook(newContainerData);
+      if (!createRes || !createRes.success) {
+        throw new Error((createRes && createRes.msg) || '新建容器失败');
+      }
+
+      await this.loadContainers();
+
+      const newIdx = this.data.containers.findIndex(c => String(c.id) === String(createRes.data.id) || String(c.code) === String(createRes.data.code));
+      const targetContainer = newIdx !== -1 ? this.data.containers[newIdx] : this.data.containers[this.data.containers.length - 1];
+
+      this.setData({
+        selectedContainerIndex: newIdx !== -1 ? newIdx : (this.data.containers.length - 1),
+        currentContainer: targetContainer,
+        allocMode: 'auto'
+      });
+
+      await this.updateTargetEmptySlot(targetContainer);
+      const newLoc = this.data.targetLocationText;
+
+      wx.hideLoading();
+      wx.showToast({ title: `已新建【${targetContainer.name}】`, icon: 'success' });
+
+      if (isManualForm) {
+        await this.saveComponentForm();
+      } else {
+        await this.saveNewInboundComponent(itemData, inboundQty, targetContainer, newLoc);
+      }
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: err.message || '新建容器失败', icon: 'none' });
+    }
+  },
+
+  async quickCreateContainer() {
+    const cur = this.data.currentContainer || {};
+    const isBox = cur.type === 'box';
+    const nextNum = this.data.containers.length + 1;
+
+    wx.showModal({
+      title: '新建元件容器',
+      content: `即将创建：\n【${nextNum}号 ${isBox ? (cur.grid_rows || 4) + '×' + (cur.grid_cols || 6) + ' 元件盒' : '元件样品册'}】\n编号: ${isBox ? 'BOX0' + nextNum : 'B0' + nextNum}\n\n是否立即创建？`,
+      confirmText: '确定创建',
+      cancelText: '取消',
+      confirmColor: '#1890ff',
+      success: async (res) => {
+        if (res.confirm) {
+          wx.showLoading({ title: '创建中...' });
+          try {
+            const createRes = await api.createBook({
+              name: isBox ? `${nextNum}号 ${cur.grid_rows || 4}×${cur.grid_cols || 6} 元件盒` : `${nextNum}号 元件样品册`,
+              code: isBox ? `BOX0${nextNum}` : `B0${nextNum}`,
+              type: cur.type || 'box',
+              category: cur.category || '常用元器件',
+              grid_rows: Number(cur.grid_rows) || 4,
+              grid_cols: Number(cur.grid_cols) || 6,
+              total_pages: Number(cur.total_pages) || 20,
+              rows_per_page: Number(cur.rows_per_page) || 12
+            });
+
+            await this.loadContainers();
+            const newIdx = this.data.containers.findIndex(c => String(c.id) === String(createRes.data.id) || String(c.code) === String(createRes.data.code));
+            const targetContainer = newIdx !== -1 ? this.data.containers[newIdx] : this.data.containers[this.data.containers.length - 1];
+
+            this.setData({
+              selectedContainerIndex: newIdx !== -1 ? newIdx : (this.data.containers.length - 1),
+              currentContainer: targetContainer,
+              allocMode: 'auto'
+            });
+
+            await this.updateTargetEmptySlot(targetContainer);
+            wx.hideLoading();
+            wx.showToast({ title: '容器创建成功', icon: 'success' });
+          } catch (e) {
+            wx.hideLoading();
+            wx.showToast({ title: '创建失败: ' + e.message, icon: 'none' });
+          }
+        }
+      }
+    });
   },
 
   resetForm() {

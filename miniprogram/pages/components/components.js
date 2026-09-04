@@ -27,6 +27,27 @@ Page({
       spec: '',
       package_name: '',
       category: ''
+    },
+    showImportPlanModal: false,
+    importPendingItems: [],
+    availableContainers: [],
+    containersListLength: 0,
+    importStats: {
+      totalTypes: 0,
+      totalEmptySlots: 0,
+      slotShortage: 0
+    },
+    importPlan: {
+      mode: 'new_box',
+      boxName: '',
+      boxCode: '',
+      category: '常用元器件',
+      gridRows: 4,
+      gridCols: 6,
+      bookName: '',
+      bookCode: '',
+      totalPages: 5,
+      rowsPerPage: 12
     }
   },
 
@@ -564,29 +585,252 @@ Page({
       return;
     }
 
-    wx.showLoading({ title: `正在录入 (0/${items.length})...` });
-    this.setData({ importing: true });
-
-    let count = 0;
+    wx.showLoading({ title: '核算仓位容量...' });
     try {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        if (i % 5 === 0) {
-          wx.showLoading({ title: `正在录入 (${i + 1}/${items.length})...` });
-        }
-        await api.createComponent(item);
-        count++;
+      const booksRes = await api.getBooks();
+      const containers = (booksRes && booksRes.data) || [];
+      const totalEmptySlots = containers.reduce((sum, b) => sum + (b.empty_slots || 0), 0);
+      const totalTypes = items.length;
+      const shortage = Math.max(0, totalTypes - totalEmptySlots);
+
+      // Recommend grid size
+      let recRows = 4;
+      let recCols = 6;
+      if (totalTypes <= 12) { recRows = 3; recCols = 4; }
+      else if (totalTypes <= 20) { recRows = 4; recCols = 5; }
+      else if (totalTypes <= 24) { recRows = 4; recCols = 6; }
+      else if (totalTypes <= 36) { recRows = 6; recCols = 6; }
+      else if (totalTypes <= 48) { recRows = 6; recCols = 8; }
+      else if (totalTypes <= 60) { recRows = 6; recCols = 10; }
+      else {
+        recRows = Math.ceil(Math.sqrt(totalTypes));
+        recCols = Math.ceil(totalTypes / recRows);
       }
 
+      const recPages = Math.max(2, Math.ceil(totalTypes / 12));
+      const nextNum = containers.length + 1;
+
       wx.hideLoading();
-      this.setData({ importing: false });
-      wx.showModal({
-        title: '🎉 Excel 导入成功！',
-        content: `成功批量录入 ${count} 种元器件物料！\n\n系统已全自动根据物料大类（电阻/电容/芯片/开关等）分配对应 12 行样品册插槽！`,
-        showCancel: false
+      this.setData({
+        importPendingItems: items,
+        availableContainers: containers.map(b => ({
+          ...b,
+          displayName: (b.type === 'box' ? '📦 ' : '📖 ') + b.name
+        })),
+        containersListLength: containers.length,
+        importStats: {
+          totalTypes,
+          totalEmptySlots,
+          slotShortage: shortage
+        },
+        importPlan: {
+          mode: 'new_box',
+          boxName: `${nextNum}号 ${recRows}×${recCols} 元件盒`,
+          boxCode: `BOX0${nextNum}`,
+          category: (items[0] && items[0].category) || '常用贴片器件',
+          gridRows: recRows,
+          gridCols: recCols,
+          bookName: `${nextNum}号 批量导入样本册`,
+          bookCode: `B0${nextNum}`,
+          totalPages: recPages,
+          rowsPerPage: 12
+        },
+        showImportPlanModal: true
       });
-      this.loadComponents();
-      this.loadCategories();
+    } catch (err) {
+      wx.hideLoading();
+      wx.showToast({ title: '核算失败: ' + err.message, icon: 'none' });
+    }
+  },
+
+  setPlanMode(e) {
+    const mode = e.currentTarget.dataset.mode;
+    this.setData({
+      'importPlan.mode': mode
+    });
+  },
+
+  onPlanInput(e) {
+    const field = e.currentTarget.dataset.field;
+    const val = e.detail.value;
+    this.setData({
+      [`importPlan.${field}`]: val
+    });
+  },
+
+  closeImportPlan() {
+    this.setData({
+      showImportPlanModal: false,
+      importPendingItems: []
+    });
+  },
+
+  async executePlannedImport() {
+    const { mode, boxName, boxCode, gridRows, gridCols, bookName, bookCode, totalPages, rowsPerPage, category } = this.data.importPlan;
+    const items = this.data.importPendingItems;
+    if (!items || items.length === 0) return;
+
+    this.setData({ importing: true });
+    wx.showLoading({ title: '正在规划入库...' });
+
+    try {
+      if (mode === 'new_box') {
+        const rows = Math.max(1, Number(gridRows) || 4);
+        const cols = Math.max(1, Number(gridCols) || 6);
+        const capacityPerBox = rows * cols;
+        const boxesNeeded = Math.ceil(items.length / capacityPerBox);
+        const createdContainers = [];
+
+        const baseNumMatch = (boxCode || '').match(/\d+/);
+        const baseNum = baseNumMatch ? parseInt(baseNumMatch[0], 10) : (this.data.containersListLength + 1);
+
+        for (let bIdx = 0; bIdx < boxesNeeded; bIdx++) {
+          const currentBoxNum = baseNum + bIdx;
+          const currentBoxCode = `BOX0${currentBoxNum}`;
+          const currentBoxName = boxesNeeded > 1 
+            ? `${boxName || (currentBoxCode + ' 元件盒')} (${bIdx + 1}/${boxesNeeded})`
+            : (boxName || `${currentBoxCode} 元件盒`);
+
+          const createRes = await api.createBook({
+            name: currentBoxName,
+            code: currentBoxCode,
+            type: 'box',
+            category: category || '贴片器件',
+            grid_rows: rows,
+            grid_cols: cols
+          });
+
+          if (createRes && createRes.success) {
+            createdContainers.push(createRes.data);
+          }
+        }
+
+        let count = 0;
+        for (let i = 0; i < items.length; i++) {
+          const bIdx = Math.floor(i / capacityPerBox);
+          const currentContainer = createdContainers[Math.min(bIdx, createdContainers.length - 1)];
+          const idxInBox = i % capacityPerBox;
+          const r = Math.floor(idxInBox / cols) + 1;
+          const c = (idxInBox % cols) + 1;
+          const locText = `${currentContainer.code}-R${String(r).padStart(2, '0')}-C${String(c).padStart(2, '0')}`;
+
+          const itemData = {
+            ...items[i],
+            book_id: currentContainer.id || currentContainer._id,
+            row_no: r,
+            col_no: c,
+            page_no: 1,
+            location_text: locText
+          };
+
+          if (i % 5 === 0) {
+            wx.showLoading({ title: `正在入库 (${i + 1}/${items.length})...` });
+          }
+          await api.createComponent(itemData);
+          count++;
+        }
+
+        wx.hideLoading();
+        this.setData({ importing: false, showImportPlanModal: false, importPendingItems: [] });
+        wx.showModal({
+          title: '🎉 批量导入并建盒成功！',
+          content: `成功新建 ${createdContainers.length} 个元件盒，并精准分配入库 ${count} 种元器件物料！\n\n所有物料已按 R×C 抽屉网格规整存放！`,
+          showCancel: false
+        });
+        this.loadComponents();
+        this.loadCategories();
+        return;
+      }
+
+      if (mode === 'new_book') {
+        const pages = Math.max(1, Number(totalPages) || 5);
+        const rows = Math.max(1, Number(rowsPerPage) || 12);
+        const capacityPerBook = pages * rows;
+        const booksNeeded = Math.ceil(items.length / capacityPerBook);
+        const createdContainers = [];
+
+        const baseNumMatch = (bookCode || '').match(/\d+/);
+        const baseNum = baseNumMatch ? parseInt(baseNumMatch[0], 10) : (this.data.containersListLength + 1);
+
+        for (let bIdx = 0; bIdx < booksNeeded; bIdx++) {
+          const currentBookNum = baseNum + bIdx;
+          const currentBookCode = `B0${currentBookNum}`;
+          const currentBookName = booksNeeded > 1
+            ? `${bookName || (currentBookCode + ' 样本册')} (${bIdx + 1}/${booksNeeded})`
+            : (bookName || `${currentBookCode} 样本册`);
+
+          const createRes = await api.createBook({
+            name: currentBookName,
+            code: currentBookCode,
+            type: 'book',
+            category: category || '贴片器件',
+            total_pages: pages,
+            rows_per_page: rows
+          });
+
+          if (createRes && createRes.success) {
+            createdContainers.push(createRes.data);
+          }
+        }
+
+        let count = 0;
+        for (let i = 0; i < items.length; i++) {
+          const bIdx = Math.floor(i / capacityPerBook);
+          const currentContainer = createdContainers[Math.min(bIdx, createdContainers.length - 1)];
+          const idxInBook = i % capacityPerBook;
+          const p = Math.floor(idxInBook / rows) + 1;
+          const r = (idxInBook % rows) + 1;
+          const locText = `${currentContainer.code}-P${String(p).padStart(2, '0')}-R${String(r).padStart(2, '0')}`;
+
+          const itemData = {
+            ...items[i],
+            book_id: currentContainer.id || currentContainer._id,
+            page_no: p,
+            row_no: r,
+            col_no: 1,
+            location_text: locText
+          };
+
+          if (i % 5 === 0) {
+            wx.showLoading({ title: `正在入库 (${i + 1}/${items.length})...` });
+          }
+          await api.createComponent(itemData);
+          count++;
+        }
+
+        wx.hideLoading();
+        this.setData({ importing: false, showImportPlanModal: false, importPendingItems: [] });
+        wx.showModal({
+          title: '🎉 批量导入并建册成功！',
+          content: `成功新建 ${createdContainers.length} 个样品册，并精准分配入库 ${count} 种元器件物料！\n\n已按 P×R 活页插槽规整存放！`,
+          showCancel: false
+        });
+        this.loadComponents();
+        this.loadCategories();
+        return;
+      }
+
+      if (mode === 'use_existing') {
+        let count = 0;
+        for (let i = 0; i < items.length; i++) {
+          if (i % 5 === 0) {
+            wx.showLoading({ title: `正在入库 (${i + 1}/${items.length})...` });
+          }
+          await api.createComponent(items[i]);
+          count++;
+        }
+
+        wx.hideLoading();
+        this.setData({ importing: false, showImportPlanModal: false, importPendingItems: [] });
+        wx.showModal({
+          title: '🎉 导入成功！',
+          content: `成功入库 ${count} 种元器件物料到现有容器空位中！`,
+          showCancel: false
+        });
+        this.loadComponents();
+        this.loadCategories();
+        return;
+      }
     } catch (err) {
       wx.hideLoading();
       this.setData({ importing: false });

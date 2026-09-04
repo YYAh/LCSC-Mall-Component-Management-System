@@ -19,7 +19,8 @@
       <text class="container-name-bold">{{currentContainer.name}}</text>
       <text class="container-code-badge">{{currentContainer.code}}</text>
       <text class="container-type-tag">{{currentContainer.type === 'box' ? (currentContainer.grid_rows + '行×' + currentContainer.grid_cols + '列') : (currentContainer.total_pages + '页×' + currentContainer.rows_per_page + '行')}}</text>
-      <text class="container-empty-tip">余 {{currentContainer.empty_slots || 0}} 空位</text>
+      <text class="container-empty-tip {{currentContainer.empty_slots === 0 ? 'text-red font-bold' : ''}}">余 {{currentContainer.empty_slots || 0}} 空位</text>
+      <button class="btn-quick-new-container" catchtap="quickCreateContainer">+ 新建容器</button>
     </view>
 
     <!-- Mode Selector Tabs -->

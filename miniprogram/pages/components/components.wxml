@@ -64,26 +64,36 @@
         </view>
       </view>
 
-      <!-- MPN Title & Stock Count -->
-      <view class="card-title-row">
-        <view class="mpn-title">{{item.mpn || item.name}}</view>
-        <view class="stock-title-box">
-          <text class="stock-lbl">库存: </text>
-          <text class="stock-num {{item.stock <= item.safe_stock ? 'text-red' : 'text-orange'}}">{{item.stock}}</text>
+      <!-- Card Main Body: Image Thumbnail on Left + Details on Right -->
+      <view class="card-main-body">
+        <image class="comp-card-thumb" src="{{item.image_url}}" mode="aspectFit" wx:if="{{item.image_url && item.image_url.length > 5}}" />
+        <view class="comp-card-thumb placeholder-thumb" wx:else>
+          <text class="thumb-icon">📦</text>
         </view>
-      </view>
 
-      <!-- Subtitle: C-Code and Spec Description -->
-      <view class="card-sub-line">
-        <text class="c-code-text" wx:if="{{item.c_code}}">{{item.c_code}}</text>
-        <text class="spec-desc-text" wx:if="{{item.spec || item.name}}">{{item.spec || item.name}}</text>
-      </view>
+        <view class="comp-card-content">
+          <!-- MPN Title & Stock Count -->
+          <view class="card-title-row">
+            <view class="mpn-title">{{item.mpn || item.name}}</view>
+            <view class="stock-title-box">
+              <text class="stock-lbl">库存: </text>
+              <text class="stock-num {{item.stock <= item.safe_stock ? 'text-red' : 'text-orange'}}">{{item.stock}}</text>
+            </view>
+          </view>
 
-      <!-- Badges Row: Brand, Package, Spec Value -->
-      <view class="tags-row">
-        <text class="tag-pill tag-brand" wx:if="{{item.brand}}">{{item.brand}}</text>
-        <text class="tag-pill tag-pkg" wx:if="{{item.package_name}}">{{item.package_name}}</text>
-        <text class="tag-pill tag-spec" wx:if="{{item.spec}}">{{item.spec}}</text>
+          <!-- Subtitle: C-Code and Spec Description -->
+          <view class="card-sub-line">
+            <text class="c-code-text" wx:if="{{item.c_code}}">{{item.c_code}}</text>
+            <text class="spec-desc-text" wx:if="{{item.spec || item.name}}">{{item.spec || item.name}}</text>
+          </view>
+
+          <!-- Badges Row: Brand, Package, Spec Value -->
+          <view class="tags-row">
+            <text class="tag-pill tag-brand" wx:if="{{item.brand}}">{{item.brand}}</text>
+            <text class="tag-pill tag-pkg" wx:if="{{item.package_name}}">{{item.package_name}}</text>
+            <text class="tag-pill tag-spec" wx:if="{{item.spec}}">{{item.spec}}</text>
+          </view>
+        </view>
       </view>
 
       <!-- Dashed Separator -->
@@ -211,7 +221,163 @@
 
       <view class="edit-modal-footer">
         <button class="btn-secondary" style="flex: 1;" bindtap="closePasteImport">取消</button>
-        <button class="btn-primary" style="flex: 2;" bindtap="submitPasteImport" loading="{{importing}}">解析并同步入库</button>
+        <button class="btn-primary" style="flex: 2;" bindtap="submitPasteImport" loading="{{importing}}">解析并规划入库</button>
+      </view>
+    </view>
+  </view>
+
+  <!-- Excel Batch Import Planning & Capacity Allocation Modal -->
+  <view class="edit-modal-mask" wx:if="{{showImportPlanModal}}">
+    <view class="edit-modal-content plan-modal-content">
+      <view class="edit-modal-title">
+        <text>📦 批量导入与仓位智能规划</text>
+        <text class="close-modal-x" bindtap="closeImportPlan">✕</text>
+      </view>
+
+      <scroll-view scroll-y class="plan-form-scroll">
+        <!-- Stats Summary Card -->
+        <view class="plan-stat-card">
+          <view class="plan-stat-item">
+            <text class="stat-num stat-blue">{{importStats.totalTypes}}</text>
+            <text class="stat-label">待导入种类</text>
+          </view>
+          <view class="plan-stat-divider"></view>
+          <view class="plan-stat-item">
+            <text class="stat-num stat-green">{{importStats.totalEmptySlots}}</text>
+            <text class="stat-label">当前库位余量</text>
+          </view>
+          <view class="plan-stat-divider" wx:if="{{importStats.slotShortage > 0}}"></view>
+          <view class="plan-stat-item" wx:if="{{importStats.slotShortage > 0}}">
+            <text class="stat-num stat-red">-{{importStats.slotShortage}}</text>
+            <text class="stat-label">容量缺口</text>
+          </view>
+        </view>
+
+        <!-- Capacity Warning / Notice -->
+        <view class="plan-alert-box alert-danger" wx:if="{{importStats.slotShortage > 0}}">
+          <text class="alert-icon">⚠️</text>
+          <text class="alert-text">现有容器余位不足以容纳全部 {{importStats.totalTypes}} 种物料！建议新建专用容器存放。</text>
+        </view>
+        <view class="plan-alert-box alert-success" wx:else>
+          <text class="alert-icon">✅</text>
+          <text class="alert-text">已提取表格中全部 {{importStats.totalTypes}} 种元器件，请选择仓位分配方式：</text>
+        </view>
+
+        <!-- Mode Selector Tabs -->
+        <view class="plan-mode-tabs">
+          <view class="plan-mode-tab {{importPlan.mode === 'new_box' ? 'active' : ''}}" bindtap="setPlanMode" data-mode="new_box">
+            <text class="mode-tab-icon">📦</text>
+            <text class="mode-tab-title">新建元件盒</text>
+            <text class="mode-tab-sub">X×X 抽屉盒</text>
+          </view>
+          <view class="plan-mode-tab {{importPlan.mode === 'new_book' ? 'active' : ''}}" bindtap="setPlanMode" data-mode="new_book">
+            <text class="mode-tab-icon">📖</text>
+            <text class="mode-tab-title">新建样本册</text>
+            <text class="mode-tab-sub">活页插槽册</text>
+          </view>
+          <view class="plan-mode-tab {{importPlan.mode === 'use_existing' ? 'active' : ''}}" bindtap="setPlanMode" data-mode="use_existing">
+            <text class="mode-tab-icon">🔄</text>
+            <text class="mode-tab-title">放入现有容器</text>
+            <text class="mode-tab-sub">顺延填补空位</text>
+          </view>
+        </view>
+
+        <!-- Form: New Box Settings -->
+        <view class="plan-settings-box" wx:if="{{importPlan.mode === 'new_box'}}">
+          <view class="settings-sec-title">🏷️ 新建元件盒参数配置</view>
+          
+          <view class="edit-form-row">
+            <text class="edit-label">盒名称</text>
+            <input class="edit-input" value="{{importPlan.boxName}}" bindinput="onPlanInput" data-field="boxName" placeholder="如：3号 4×6 常用阻容盒" />
+          </view>
+
+          <view class="edit-form-row">
+            <text class="edit-label">盒编号</text>
+            <input class="edit-input font-bold" value="{{importPlan.boxCode}}" bindinput="onPlanInput" data-field="boxCode" placeholder="如：BOX03" />
+          </view>
+
+          <view class="edit-form-row">
+            <text class="edit-label">分类标签</text>
+            <input class="edit-input" value="{{importPlan.category}}" bindinput="onPlanInput" data-field="category" placeholder="如：常用贴片器件" />
+          </view>
+
+          <view class="plan-matrix-row">
+            <view class="matrix-input-group">
+              <text class="matrix-label">抽屉行数 (Rows)</text>
+              <input class="matrix-input" type="number" value="{{importPlan.gridRows}}" bindinput="onPlanInput" data-field="gridRows" />
+            </view>
+            <text class="matrix-x">×</text>
+            <view class="matrix-input-group">
+              <text class="matrix-label">抽屉列数 (Cols)</text>
+              <input class="matrix-input" type="number" value="{{importPlan.gridCols}}" bindinput="onPlanInput" data-field="gridCols" />
+            </view>
+          </view>
+
+          <view class="plan-capacity-summary">
+            <text>新建总格数：<text class="font-bold text-blue">{{importPlan.gridRows * importPlan.gridCols}} 格</text></text>
+            <text wx:if="{{(importPlan.gridRows * importPlan.gridCols) >= importStats.totalTypes}}" class="text-green font-bold">（可容纳全部物料，剩余 {{ (importPlan.gridRows * importPlan.gridCols) - importStats.totalTypes }} 空格）</text>
+            <text wx:else class="text-red font-bold">（容量不足，多出的物料将自动顺延下一盒）</text>
+          </view>
+        </view>
+
+        <!-- Form: New Book Settings -->
+        <view class="plan-settings-box" wx:if="{{importPlan.mode === 'new_book'}}">
+          <view class="settings-sec-title">📖 新建元器件样本册参数配置</view>
+
+          <view class="edit-form-row">
+            <text class="edit-label">册名称</text>
+            <input class="edit-input" value="{{importPlan.bookName}}" bindinput="onPlanInput" data-field="bookName" placeholder="如：4号 贴片阻容样本册" />
+          </view>
+
+          <view class="edit-form-row">
+            <text class="edit-label">册编号</text>
+            <input class="edit-input font-bold" value="{{importPlan.bookCode}}" bindinput="onPlanInput" data-field="bookCode" placeholder="如：B04" />
+          </view>
+
+          <view class="edit-form-row">
+            <text class="edit-label">分类标签</text>
+            <input class="edit-input" value="{{importPlan.category}}" bindinput="onPlanInput" data-field="category" placeholder="如：贴片电阻/电容" />
+          </view>
+
+          <view class="plan-matrix-row">
+            <view class="matrix-input-group">
+              <text class="matrix-label">总页数 (Pages)</text>
+              <input class="matrix-input" type="number" value="{{importPlan.totalPages}}" bindinput="onPlanInput" data-field="totalPages" />
+            </view>
+            <text class="matrix-x">×</text>
+            <view class="matrix-input-group">
+              <text class="matrix-label">每页行数 (Rows)</text>
+              <input class="matrix-input" type="number" value="{{importPlan.rowsPerPage}}" bindinput="onPlanInput" data-field="rowsPerPage" />
+            </view>
+          </view>
+
+          <view class="plan-capacity-summary">
+            <text>新建总容量：<text class="font-bold text-blue">{{importPlan.totalPages * importPlan.rowsPerPage}} 格</text></text>
+            <text wx:if="{{(importPlan.totalPages * importPlan.rowsPerPage) >= importStats.totalTypes}}" class="text-green font-bold">（可容纳全部物料，剩余 {{ (importPlan.totalPages * importPlan.rowsPerPage) - importStats.totalTypes }} 空位）</text>
+            <text wx:else class="text-red font-bold">（容量不足，多出的物料将自动顺延下一册）</text>
+          </view>
+        </view>
+
+        <!-- Form: Use Existing Containers -->
+        <view class="plan-settings-box" wx:if="{{importPlan.mode === 'use_existing'}}">
+          <view class="settings-sec-title">🗄️ 现有容器空位顺序填补</view>
+          <view class="existing-books-list">
+            <view class="existing-book-row" wx:for="{{availableContainers}}" wx:key="id">
+              <text class="ex-book-name">{{item.displayName || item.name}}</text>
+              <text class="ex-book-badge {{item.empty_slots > 0 ? 'badge-green' : 'badge-gray'}}">余 {{item.empty_slots}} 格</text>
+            </view>
+          </view>
+          <view class="plan-notice" wx:if="{{importStats.slotShortage > 0}}">
+            <text class="text-red">注意：现有空位数({{importStats.totalEmptySlots}}) 小于物料种类数({{importStats.totalTypes}})，填满后多余的 {{importStats.slotShortage}} 种物料将等待您后续建盒分配。</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="edit-modal-footer">
+        <button class="btn-secondary" style="flex: 1;" bindtap="closeImportPlan">取消</button>
+        <button class="btn-primary" style="flex: 2;" bindtap="executePlannedImport" loading="{{importing}}">
+          🚀 确认规划并执行入库
+        </button>
       </view>
     </view>
   </view>

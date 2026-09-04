@@ -85,6 +85,18 @@
   font-weight: 600;
 }
 
+.btn-quick-new-container {
+  background: #f0fdf4 !important;
+  color: #16a34a !important;
+  border: 1px solid #bbf7d0 !important;
+  font-size: 20rpx !important;
+  font-weight: 700 !important;
+  padding: 4rpx 14rpx !important;
+  border-radius: 20rpx !important;
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
 /* Allocation Mode Tabs */
 .alloc-mode-tabs {
   display: flex;
