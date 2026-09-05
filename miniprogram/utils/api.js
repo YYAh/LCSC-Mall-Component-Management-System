@@ -224,13 +224,13 @@ function formatProduct(p, kw) {
   };
 }
 
-// Direct HTTP query to EasyEDA for fallback
+// Direct HTTP query to EasyEDA for fallback (Fast 2.5s timeout)
 function queryEasyEdaDirect(keyword) {
   return new Promise((resolve) => {
     wx.request({
       url: `https://pro.lceda.cn/api/eda/product/search?keyword=${encodeURIComponent(keyword)}`,
       method: 'GET',
-      timeout: 8000,
+      timeout: 2500,
       success: (res) => {
         if (res.statusCode === 200 && res.data && res.data.result && res.data.result.productList && res.data.result.productList.length > 0) {
           const list = res.data.result.productList;
@@ -278,7 +278,7 @@ const api = {
   setServerUrl,
   matchBookForCategory,
 
-  // JLC QR Parse
+  // JLC QR Parse with Fast-Path Local Matching
   async parseJlcQr(text) {
     const mode = getEngineMode();
     if (mode === 'rest') {
@@ -304,11 +304,32 @@ const api = {
       } catch (e) {}
     }
 
-    // Local parser with smart classification & offline resistor/capacitor decoding
+    // 1. Local parser with smart classification & offline resistor/capacitor decoding
     const parsed = qrParser.parseJlcQrCode(text);
     if (!parsed) throw new Error('无法解析的条码格式');
 
-    // Prefer cCode, then mpn for official lookup
+    // 2. Fast-Path: Check if we have this component in local DB already!
+    // If it already exists, return immediately without waiting for slow external network!
+    const localExisting = await this.findExistingComponent(parsed.cCode, parsed.mpn);
+    if (localExisting) {
+      return {
+        success: true,
+        data: {
+          qrInfo: parsed,
+          isExisting: true,
+          existingComponent: localExisting,
+          component: {
+            ...localExisting,
+            c_code: parsed.cCode || localExisting.c_code || '',
+            mpn: parsed.mpn || localExisting.mpn || '',
+            inbound_qty: parsed.qty || 10,
+            order_no: parsed.orderNo || localExisting.order_no || ''
+          }
+        }
+      };
+    }
+
+    // 3. New component: Query EasyEDA with 2500ms timeout
     const queryKw = parsed.cCode || parsed.mpn;
     let comp = null;
 
@@ -326,35 +347,25 @@ const api = {
     }
 
     if (!comp) {
-      // Check if we have this component in local DB already!
-      const localExisting = await this.findExistingComponent(parsed.cCode, parsed.mpn);
-      if (localExisting) {
-        comp = {
-          ...localExisting,
-          inbound_qty: parsed.qty || localExisting.stock || 10,
-          order_no: parsed.orderNo || localExisting.order_no || ''
-        };
-      } else {
-        const fallbackRaw = {
-          c_code: parsed.cCode || '',
-          mpn: parsed.mpn || parsed.cCode || '电子元器件',
-          name: parsed.mpn || parsed.cCode || '电子元器件',
-          category: '',
-          brand: '',
-          package_name: '',
-          image_url: '',
-          inbound_qty: parsed.qty || 10,
-          order_no: parsed.orderNo || ''
-        };
-        const cl = classifyComponent(fallbackRaw);
-        comp = {
-          ...fallbackRaw,
-          category: cl.category || '常用电子器件',
-          package_name: cl.package_name || '',
-          spec: cl.spec || fallbackRaw.mpn,
-          brand: cl.brand || '国产优质/通用'
-        };
-      }
+      const fallbackRaw = {
+        c_code: parsed.cCode || '',
+        mpn: parsed.mpn || parsed.cCode || '电子元器件',
+        name: parsed.mpn || parsed.cCode || '电子元器件',
+        category: '',
+        brand: '',
+        package_name: '',
+        image_url: '',
+        inbound_qty: parsed.qty || 10,
+        order_no: parsed.orderNo || ''
+      };
+      const cl = classifyComponent(fallbackRaw);
+      comp = {
+        ...fallbackRaw,
+        category: cl.category || '常用电子器件',
+        package_name: cl.package_name || '',
+        spec: cl.spec || fallbackRaw.mpn,
+        brand: cl.brand || '国产优质/通用'
+      };
     }
 
     const finalCCode = parsed.cCode || comp.c_code || '';
@@ -364,6 +375,7 @@ const api = {
       success: true,
       data: {
         qrInfo: parsed,
+        isExisting: false,
         component: {
           ...comp,
           c_code: finalCCode,
@@ -563,21 +575,23 @@ const api = {
     const cleanMpn = mpn ? String(mpn).trim().toUpperCase() : '';
     const pureC = cleanC.replace(/^C/i, '');
 
+    const isGeneric = (str) => !str || ['电子元器件', '常用电子器件', '常用器件', '贴片器件', '待补充', '--', 'UNKNOWN', 'NULL'].includes(str.trim().toUpperCase());
+
     return list.find(c => {
       const itemC = (c.c_code || '').trim().toUpperCase();
       const itemMpn = (c.mpn || '').trim().toUpperCase();
       const pureItemC = itemC.replace(/^C/i, '');
 
-      // 1. Direct C-code match (with or without 'C' prefix)
+      // 1. Direct C-code match (with or without 'C' prefix, min length 2 digits)
       if (cleanC && itemC && cleanC === itemC) return true;
-      if (pureC && pureItemC && pureC === pureItemC) return true;
+      if (pureC && pureItemC && pureC === pureItemC && pureC.length >= 2) return true;
 
-      // 2. Direct MPN match
-      if (cleanMpn && itemMpn && cleanMpn === itemMpn) return true;
+      // 2. Direct MPN match (ignore generic placeholders)
+      if (cleanMpn && itemMpn && cleanMpn === itemMpn && !isGeneric(cleanMpn) && !isGeneric(itemMpn)) return true;
 
       // 3. Cross match (in case user stored c_code in mpn or vice-versa)
-      if (cleanC && itemMpn && cleanC === itemMpn) return true;
-      if (cleanMpn && itemC && cleanMpn === itemC) return true;
+      if (cleanC && itemMpn && cleanC === itemMpn && !isGeneric(cleanC)) return true;
+      if (cleanMpn && itemC && cleanMpn === itemC && !isGeneric(cleanMpn)) return true;
 
       return false;
     }) || null;

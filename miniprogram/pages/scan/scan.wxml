@@ -261,4 +261,92 @@
       </view>
     </view>
   </view>
+
+  <!-- Duplicate Component Modal (⚠️ 元器件已在库确认弹窗) -->
+  <view class="modal-overlay" wx:if="{{showDuplicateModal}}">
+    <view class="modal-card dup-modal-card">
+      <view class="modal-header dup-modal-header">
+        <view class="modal-title dup-warn-title">⚠️ 检测到该元器件已在库</view>
+        <text class="modal-close" bindtap="closeDuplicateModal">✕</text>
+      </view>
+      <view class="modal-body">
+        <view class="dup-comp-banner">
+          <view class="dup-mpn-box">
+            <text class="dup-mpn-text">{{duplicateInfo.existingComp.mpn || duplicateInfo.existingComp.name}}</text>
+            <text class="dup-c-code" wx:if="{{duplicateInfo.existingComp.c_code}}">{{duplicateInfo.existingComp.c_code}}</text>
+          </view>
+          <view class="dup-spec-text">{{duplicateInfo.existingComp.spec || duplicateInfo.existingComp.name}}</view>
+        </view>
+
+        <!-- Location comparison cards -->
+        <view class="dup-compare-box">
+          <!-- Old Location -->
+          <view class="dup-slot-card old-slot">
+            <view class="slot-badge old-badge">原存放仓位</view>
+            <view class="slot-loc">{{duplicateInfo.existingComp.location_text || '未分配'}}</view>
+            <view class="slot-stock">现有库存: <text class="stock-hl-blue">{{duplicateInfo.existingComp.stock || 0}}</text> 个</view>
+          </view>
+
+          <!-- Preselected Location -->
+          <view class="dup-slot-card new-slot">
+            <view class="slot-badge new-badge">扫码前预选仓位</view>
+            <view class="slot-loc">{{duplicateInfo.targetLoc}}</view>
+            <view class="slot-stock">本次扫码: <text class="stock-hl-green">+{{duplicateInfo.inboundQty}}</text> 个</view>
+          </view>
+        </view>
+
+        <view class="dup-select-tip">请选择入库方式：</view>
+
+        <view class="dup-modal-actions">
+          <button class="btn-primary dup-btn-append" bindtap="onDuplicateAppendStock" loading="{{saving}}">
+            ➕ 追加原仓位库存 (+{{duplicateInfo.inboundQty}}个)
+          </button>
+          <button class="btn-secondary dup-btn-newslot" bindtap="onDuplicateSaveNewSlot" loading="{{saving}}">
+            📦 存入预选新仓位 [{{duplicateInfo.targetLoc}}]
+          </button>
+          <button class="dup-btn-cancel" bindtap="closeDuplicateModal">
+            取消
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Container Full Modal (⚠️ 容器已满提醒弹窗) -->
+  <view class="modal-overlay" wx:if="{{showFullContainerModal}}">
+    <view class="modal-card full-modal-card">
+      <view class="modal-header full-modal-header">
+        <view class="modal-title full-warn-title">⚠️ 当前容器已存满！</view>
+        <text class="modal-close" bindtap="closeFullContainerModal">✕</text>
+      </view>
+      <view class="modal-body">
+        <view class="full-notice-box">
+          <view class="full-notice-text">
+            您当前选中的容器：
+          </view>
+          <view class="full-container-tag">
+            {{fullContainerInfo.container.name || currentContainer.name}}
+          </view>
+          <view class="full-notice-sub">
+            所有储位已全部用完！无法继续顺延分配空位。
+          </view>
+        </view>
+
+        <view class="full-item-row" wx:if="{{fullContainerInfo.itemData}}">
+          <text class="full-item-lbl">待存入器件: </text>
+          <text class="full-item-name">{{fullContainerInfo.itemData.mpn || fullContainerInfo.itemData.name}}</text>
+          <text class="full-item-qty">(+{{fullContainerInfo.inboundQty || 10}}个)</text>
+        </view>
+
+        <view class="full-modal-actions">
+          <button class="btn-primary full-btn-create" bindtap="onFullContainerCreateNext" loading="{{saving}}">
+            ✨ 立即新建下一个容器并入库
+          </button>
+          <button class="btn-secondary full-btn-switch" bindtap="closeFullContainerModal">
+            🔄 换其他有余量的容器
+          </button>
+        </view>
+      </view>
+    </view>
+  </view>
 </view>

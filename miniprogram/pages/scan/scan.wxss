@@ -672,3 +672,255 @@
   color: #94a3b8;
   margin-top: 4rpx;
 }
+
+/* ============================================== */
+/* Duplicate Component Modal & Full Container Modal */
+/* ============================================== */
+.dup-modal-card, .full-modal-card {
+  max-width: 660rpx;
+  border-radius: 24rpx;
+}
+
+.dup-modal-header {
+  background: #fffbeb;
+  border-bottom: 1px solid #fef3c7;
+}
+
+.dup-warn-title {
+  color: #b45309;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.dup-comp-banner {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14rpx;
+  padding: 16rpx 20rpx;
+  margin-bottom: 20rpx;
+}
+
+.dup-mpn-box {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.dup-mpn-text {
+  font-size: 28rpx;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.dup-c-code {
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 20rpx;
+  font-weight: 700;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  border: 1px solid #bfdbfe;
+}
+
+.dup-spec-text {
+  font-size: 22rpx;
+  color: #64748b;
+  margin-top: 6rpx;
+}
+
+.dup-compare-box {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.dup-slot-card {
+  flex: 1;
+  border-radius: 14rpx;
+  padding: 16rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.old-slot {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+}
+
+.new-slot {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+}
+
+.slot-badge {
+  font-size: 20rpx;
+  font-weight: 700;
+  display: inline-block;
+  align-self: flex-start;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+}
+
+.old-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.new-badge {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.slot-loc {
+  font-size: 24rpx;
+  font-weight: 800;
+  color: #0f172a;
+  word-break: break-all;
+}
+
+.slot-stock {
+  font-size: 20rpx;
+  color: #475569;
+}
+
+.stock-hl-blue {
+  color: #0284c7;
+  font-weight: 800;
+  font-size: 24rpx;
+}
+
+.stock-hl-green {
+  color: #16a34a;
+  font-weight: 800;
+  font-size: 24rpx;
+}
+
+.dup-select-tip {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 16rpx;
+  text-align: center;
+}
+
+.dup-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.dup-btn-append {
+  background: #1890ff !important;
+  color: #ffffff !important;
+  font-size: 28rpx;
+  font-weight: 700;
+  padding: 20rpx;
+  border-radius: 12rpx;
+}
+
+.dup-btn-newslot {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 26rpx;
+  font-weight: 600;
+  padding: 18rpx;
+  border-radius: 12rpx;
+}
+
+.dup-btn-cancel {
+  background: transparent !important;
+  color: #94a3b8 !important;
+  font-size: 24rpx;
+  margin-top: 4rpx;
+}
+
+/* Full container modal styles */
+.full-modal-header {
+  background: #fef2f2;
+  border-bottom: 1px solid #fee2e2;
+}
+
+.full-warn-title {
+  color: #dc2626;
+  font-size: 30rpx;
+  font-weight: 800;
+}
+
+.full-notice-box {
+  background: #fff7ed;
+  border: 1px solid #ffedd5;
+  border-radius: 14rpx;
+  padding: 20rpx;
+  text-align: center;
+  margin-bottom: 20rpx;
+}
+
+.full-notice-text {
+  font-size: 24rpx;
+  color: #9a3412;
+}
+
+.full-container-tag {
+  font-size: 30rpx;
+  font-weight: 800;
+  color: #c2410c;
+  margin: 10rpx 0;
+}
+
+.full-notice-sub {
+  font-size: 22rpx;
+  color: #ea580c;
+}
+
+.full-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 24rpx;
+  background: #f8fafc;
+  padding: 14rpx;
+  border-radius: 10rpx;
+  margin-bottom: 20rpx;
+}
+
+.full-item-lbl {
+  color: #64748b;
+}
+
+.full-item-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.full-item-qty {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.full-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.full-btn-create {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  font-size: 28rpx;
+  font-weight: 700;
+  padding: 20rpx;
+  border-radius: 12rpx;
+}
+
+.full-btn-switch {
+  background: #f8fafc !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 26rpx;
+  font-weight: 600;
+  padding: 18rpx;
+  border-radius: 12rpx;
+}

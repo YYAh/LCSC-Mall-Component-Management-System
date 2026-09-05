@@ -28,6 +28,14 @@ Page({
     bookPageOptions: [],
     bookRowOptions: [],
 
+    // Duplicate Component Modal (已在库确认弹窗)
+    showDuplicateModal: false,
+    duplicateInfo: null,
+
+    // Container Full Modal (容器已满提醒弹窗)
+    showFullContainerModal: false,
+    fullContainerInfo: null,
+
     formData: {
       c_code: '',
       mpn: '',
@@ -287,6 +295,13 @@ Page({
   },
 
   startScan() {
+    const container = this.data.currentContainer;
+    // Capacity pre-check: if full, prompt immediately before opening camera!
+    if (this.data.targetLocationText.includes('已存满') || (container && container.empty_slots === 0)) {
+      this.promptFullContainerCreate(null, 0, container, false, true);
+      return;
+    }
+
     wx.scanCode({
       scanType: ['qrCode', 'barCode'],
       success: (res) => {
@@ -307,6 +322,7 @@ Page({
 
   async handleParsedRawText(rawText) {
     if (!rawText) return;
+    this.setData({ showDuplicateModal: false, showFullContainerModal: false });
     wx.showLoading({ title: '智能解析中...' });
 
     try {
@@ -338,46 +354,21 @@ Page({
       }
 
       // 1. Check if this component already exists in DB
-      const existingComp = await api.findExistingComponent(comp.c_code, comp.mpn);
+      let existingComp = (res.data.isExisting && res.data.existingComponent) || null;
+      if (!existingComp) {
+        existingComp = await api.findExistingComponent(comp.c_code, comp.mpn);
+      }
 
       if (existingComp) {
         try { wx.vibrateShort(); } catch (e) {}
 
-        const oldLoc = existingComp.location_text || '未分配';
-        const oldStock = existingComp.stock || 0;
-        const compName = existingComp.name || existingComp.mpn || existingComp.c_code;
-
-        wx.showModal({
-          title: '⚠️ 该元器件已在库',
-          content: `检测到【${compName}】已在库中！\n\n• 原存放仓位: [${oldLoc}] (现有库存: ${oldStock})\n• 扫码前预选新仓位: [${targetLoc}]\n\n请选择入库方式：`,
-          confirmText: `追加原仓位(+${inboundQty})`,
-          cancelText: `存入预选仓位`,
-          confirmColor: '#1890ff',
-          success: async (mRes) => {
-            if (mRes.confirm) {
-              wx.showLoading({ title: '追加入库中...' });
-              try {
-                await api.stockIn({
-                  component_id: existingComp.id || existingComp._id,
-                  qty: inboundQty,
-                  order_no: comp.order_no || '',
-                  remark: '扫码追加入库'
-                });
-                const updated = await api.getComponentDetail(existingComp.id || existingComp._id);
-                wx.hideLoading();
-                this.setData({
-                  autoSavedItem: updated.data,
-                  isAppendedStock: true
-                });
-                wx.showToast({ title: `已追加 +${inboundQty} 个！`, icon: 'success' });
-              } catch (stockErr) {
-                wx.hideLoading();
-                wx.showToast({ title: '追加失败: ' + stockErr.message, icon: 'none' });
-              }
-            } else {
-              // Save into the preselected location!
-              await this.saveNewInboundComponent(comp, inboundQty, container, targetLoc);
-            }
+        this.setData({
+          showDuplicateModal: true,
+          duplicateInfo: {
+            existingComp: existingComp,
+            newComp: comp,
+            inboundQty: inboundQty,
+            targetLoc: targetLoc
           }
         });
         return;
@@ -603,25 +594,92 @@ Page({
     }
   },
 
-  promptFullContainerCreate(itemData, inboundQty, container, isManualForm) {
-    const typeText = container.type === 'box' ? '元件盒' : '样本册';
-    wx.showModal({
-      title: '⚠️ 当前容器已存满！',
-      content: `您当前选中的【${container.name}】(${typeText}) 所有储位已全部用完！\n\n是否立即新建下一个${typeText}继续入库？`,
-      confirmText: '立即新建',
-      cancelText: '换其他容器',
-      confirmColor: '#1890ff',
-      success: async (mRes) => {
-        if (mRes.confirm) {
-          await this.createNextContainerAndInbound(itemData, inboundQty, container, isManualForm);
-        } else {
-          wx.showToast({ title: '请在上方切换有余量的容器', icon: 'none' });
-        }
+  // Duplicate Component Modal Handlers
+  closeDuplicateModal() {
+    this.setData({ showDuplicateModal: false, duplicateInfo: null });
+  },
+
+  async onDuplicateAppendStock() {
+    const dup = this.data.duplicateInfo;
+    if (!dup || !dup.existingComp) return;
+
+    this.setData({ saving: true });
+    wx.showLoading({ title: '追加入库中...' });
+
+    try {
+      await api.stockIn({
+        component_id: dup.existingComp.id || dup.existingComp._id,
+        qty: dup.inboundQty,
+        order_no: (dup.newComp && dup.newComp.order_no) || '',
+        remark: '扫码追加入库'
+      });
+
+      const updated = await api.getComponentDetail(dup.existingComp.id || dup.existingComp._id);
+      wx.hideLoading();
+      this.setData({
+        saving: false,
+        showDuplicateModal: false,
+        duplicateInfo: null,
+        autoSavedItem: updated.data,
+        isAppendedStock: true
+      });
+
+      try { wx.vibrateShort(); } catch (e) {}
+      wx.showToast({ title: `已追加 +${dup.inboundQty} 个！`, icon: 'success' });
+    } catch (stockErr) {
+      wx.hideLoading();
+      this.setData({ saving: false });
+      wx.showToast({ title: '追加失败: ' + stockErr.message, icon: 'none' });
+    }
+  },
+
+  async onDuplicateSaveNewSlot() {
+    const dup = this.data.duplicateInfo;
+    if (!dup || !dup.newComp) return;
+
+    const targetLoc = dup.targetLoc;
+    const newComp = dup.newComp;
+    const inboundQty = dup.inboundQty;
+
+    this.setData({ showDuplicateModal: false, duplicateInfo: null });
+    await this.saveNewInboundComponent(newComp, inboundQty, this.data.currentContainer, targetLoc);
+  },
+
+  // Full Container Handlers
+  promptFullContainerCreate(itemData, inboundQty, container, isManualForm, isPreScan) {
+    if (!container) return;
+    this.setData({
+      showFullContainerModal: true,
+      fullContainerInfo: {
+        itemData: itemData || null,
+        inboundQty: inboundQty || 0,
+        container: container,
+        isManualForm: !!isManualForm,
+        isPreScan: !!isPreScan
       }
     });
   },
 
-  async createNextContainerAndInbound(itemData, inboundQty, oldContainer, isManualForm) {
+  closeFullContainerModal() {
+    this.setData({ showFullContainerModal: false, fullContainerInfo: null });
+    wx.showToast({ title: '请在上方切换有余量的容器', icon: 'none' });
+  },
+
+  async onFullContainerCreateNext() {
+    const info = this.data.fullContainerInfo;
+    this.setData({ showFullContainerModal: false });
+    if (!info) return;
+
+    await this.createNextContainerAndInbound(
+      info.itemData,
+      info.inboundQty,
+      info.container,
+      info.isManualForm,
+      info.isPreScan
+    );
+  },
+
+  async createNextContainerAndInbound(itemData, inboundQty, oldContainer, isManualForm, isPreScan) {
     wx.showLoading({ title: '正在新建容器...' });
     try {
       const nextNum = this.data.containers.length + 1;
@@ -659,9 +717,14 @@ Page({
       wx.hideLoading();
       wx.showToast({ title: `已新建【${targetContainer.name}】`, icon: 'success' });
 
-      if (isManualForm) {
+      if (isPreScan) {
+        // Pre-scan create: directly open camera now that new container is ready!
+        setTimeout(() => {
+          this.startScan();
+        }, 500);
+      } else if (isManualForm) {
         await this.saveComponentForm();
-      } else {
+      } else if (itemData) {
         await this.saveNewInboundComponent(itemData, inboundQty, targetContainer, newLoc);
       }
     } catch (err) {
