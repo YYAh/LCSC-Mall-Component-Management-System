@@ -1107,6 +1107,18 @@ const api = {
     }
 
     let books = LocalStorage._get('LOCAL_BOOKS', []);
+    if (books.length <= 1) {
+      return { success: false, msg: '系统至少需要保留一个仓位容器，不可全部删除' };
+    }
+
+    const targetBook = books.find(b => String(b.id) === String(bookId) || String(b._id) === String(bookId));
+    if (targetBook && targetBook.type === 'box') {
+      const boxCount = books.filter(b => b.type === 'box').length;
+      if (boxCount <= 1) {
+        return { success: false, msg: '系统至少需要保留一个元件盒，不可全部删除' };
+      }
+    }
+
     books = books.filter(b => String(b.id) !== String(bookId) && String(b._id) !== String(bookId));
     LocalStorage._set('LOCAL_BOOKS', books);
     return { success: true, msg: '容器已删除' };

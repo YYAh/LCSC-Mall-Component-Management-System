@@ -15,7 +15,7 @@
 
       <view class="book-action-btns">
         <button class="add-book-btn" bindtap="openAddModal">+ 新建容器</button>
-        <button class="del-book-btn" bindtap="confirmDeleteBook" wx:if="{{books.length > 1}}">🗑️ 删除</button>
+        <button class="del-book-btn" bindtap="confirmDeleteBook">🗑️ 删除</button>
       </view>
     </view>
 

@@ -273,6 +273,29 @@ Page({
     const book = this.data.currentBook;
     if (!book) return;
 
+    // 1. Check total containers count
+    if (this.data.books.length <= 1) {
+      wx.showModal({
+        title: '无法删除',
+        content: '系统运行依托于仓位容器，至少需要保留一个元件容器，不可全部删除！\n\n如需更换其他规格，请先点击【+ 新建容器】新建好后，再删除当前容器。',
+        confirmText: '我知道了',
+        showCancel: false
+      });
+      return;
+    }
+
+    // 2. If deleting a component box (type === 'box'), check if this is the last box
+    const boxCount = this.data.books.filter(b => b.type === 'box').length;
+    if (book.type === 'box' && boxCount <= 1) {
+      wx.showModal({
+        title: '无法删除',
+        content: '系统至少需要保留一个元件盒，不可全部删除！\n\n如需更换为其他规格或名称，请先点击【+ 新建容器】新建好新元件盒后，再删除当前盒。',
+        confirmText: '我知道了',
+        showCancel: false
+      });
+      return;
+    }
+
     const typeText = book.type === 'box' ? '元件盒' : '样品册';
     wx.showModal({
       title: `确认删除${typeText}`,
@@ -282,7 +305,10 @@ Page({
       success: async (res) => {
         if (res.confirm) {
           try {
-            await api.deleteBook(book.id || book._id);
+            const delRes = await api.deleteBook(book.id || book._id);
+            if (delRes && !delRes.success) {
+              throw new Error(delRes.msg || '删除失败');
+            }
             wx.showToast({ title: '已删除', icon: 'success' });
             this.setData({ currentBookIndex: 0 });
             this.loadBooks();
