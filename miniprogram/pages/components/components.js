@@ -438,61 +438,149 @@ Page({
       return;
     }
 
-    let csvContent = '\uFEFF大类,厂家型号(PM),立创编号(PC),品牌,参数,封装值,库存数量,入库时间,仓位,备注\n';
-    list.forEach(c => {
-      const cat = (c.category || '').replace(/"/g, '""');
-      const mpn = (c.mpn || '').replace(/"/g, '""');
-      const code = (c.c_code || '').replace(/"/g, '""');
-      const brand = (c.brand || '').replace(/"/g, '""');
-      const spec = (c.spec || c.name || '').replace(/"/g, '""');
-      const pkg = (c.package_name || '').replace(/"/g, '""');
-      const stock = c.stock || 0;
-      const date = (c.created_at || '').replace(/"/g, '""');
-      const loc = (c.location_text || '').replace(/"/g, '""');
-      const remark = (c.order_no ? '订单:' + c.order_no : '').replace(/"/g, '""');
+    wx.showLoading({ title: '正在导出表格...' });
 
-      csvContent += `"${cat}","${mpn}","${code}","${brand}","${spec}","${pkg}",${stock},"${date}","${loc}","${remark}"\n`;
-    });
+    try {
+      const headers = ['大类', '厂家型号(PM)', '立创编号(PC)', '品牌', '参数', '封装值', '库存数量', '入库时间', '仓位', '备注'];
+      const rows = [headers];
+      let csvContent = '\uFEFF' + headers.join(',') + '\n';
 
-    const fs = wx.getFileSystemManager();
-    const filePath = `${wx.env.USER_DATA_PATH}/嘉立创元器件库存清单.csv`;
+      list.forEach(c => {
+        const cat = c.category || '';
+        const mpn = c.mpn || '';
+        const code = c.c_code || '';
+        const brand = c.brand || '';
+        const spec = c.spec || c.name || '';
+        const pkg = c.package_name || '';
+        const stock = typeof c.stock === 'number' ? c.stock : (parseInt(c.stock, 10) || 0);
+        const date = c.created_at || '';
+        const loc = c.location_text || '';
+        const remark = c.order_no ? '订单:' + c.order_no : '';
 
-    fs.writeFile({
-      filePath,
-      data: csvContent,
-      encoding: 'utf8',
-      success: () => {
-        wx.showModal({
-          title: 'Excel 表格已生成',
-          content: `共导出 ${list.length} 条元器件数据！\n\n点击【打开查看】即可在手机中直接使用 Excel / WPS 查看或转发给微信好友与电脑。`,
-          confirmText: '打开查看',
-          cancelText: '复制文本',
-          success: (mRes) => {
-            if (mRes.confirm) {
-              wx.openDocument({
+        rows.push([cat, mpn, code, brand, spec, pkg, stock, date, loc, remark]);
+
+        const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
+        csvContent += `${esc(cat)},${esc(mpn)},${esc(code)},${esc(brand)},${esc(spec)},${esc(pkg)},${stock},${esc(date)},${esc(loc)},${esc(remark)}\n`;
+      });
+
+      const fs = wx.getFileSystemManager();
+      const xlsxBuffer = excelParser.generateXlsx(rows, '嘉立创元器件清单');
+      const nowStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const fileName = `嘉立创元器件库存清单_${nowStr}.xlsx`;
+      const filePath = `${wx.env.USER_DATA_PATH}/${fileName}`;
+
+      fs.writeFile({
+        filePath,
+        data: xlsxBuffer,
+        encoding: 'binary',
+        success: () => {
+          wx.hideLoading();
+
+          const sysInfo = wx.getSystemInfoSync ? wx.getSystemInfoSync() : {};
+          const isPC = sysInfo.platform === 'windows' || sysInfo.platform === 'mac';
+
+          const openDirectly = () => {
+            wx.openDocument({
+              filePath,
+              fileType: 'xlsx',
+              showMenu: true,
+              success: () => {
+                console.log('文件打开成功');
+              },
+              fail: (err) => {
+                console.warn('openDocument fail:', err);
+                wx.showToast({ title: '打开失败: ' + (err.errMsg || ''), icon: 'none' });
+              }
+            });
+          };
+
+          const saveToDisk = () => {
+            if (wx.saveFileToDisk) {
+              wx.saveFileToDisk({
                 filePath,
-                fileType: 'csv',
-                showMenu: true,
-                fail: (e) => {
-                  wx.showToast({ title: '打开失败: ' + e.errMsg, icon: 'none' });
+                fileName,
+                success: () => {
+                  wx.showToast({ title: '已保存到电脑', icon: 'success' });
+                },
+                fail: (err) => {
+                  if (err.errMsg && !err.errMsg.includes('cancel')) {
+                    openDirectly();
+                  }
                 }
               });
             } else {
-              wx.setClipboardData({ data: csvContent });
+              openDirectly();
             }
-          }
-        });
-      },
-      fail: () => {
-        wx.setClipboardData({
-          data: csvContent,
-          success: () => {
-            wx.showToast({ title: '表格内容已复制到剪贴板', icon: 'success' });
-          }
-        });
-      }
-    });
+          };
+
+          const shareDirectly = () => {
+            if (wx.shareFileMessage) {
+              wx.shareFileMessage({
+                filePath,
+                fileName,
+                success: () => {
+                  wx.showToast({ title: '已发送', icon: 'success' });
+                },
+                fail: (err) => {
+                  if (err.errMsg && !err.errMsg.includes('cancel')) {
+                    openDirectly();
+                  }
+                }
+              });
+            } else {
+              openDirectly();
+            }
+          };
+
+          const itemList = isPC
+            ? ['💾 保存 Excel 文件到电脑', '📱 打开查看 (WPS/Office)', '📋 复制表格文本']
+            : ['📤 发送 Excel 到微信好友/电脑 (推荐)', '📱 在手机中直接打开查看 (WPS/Office)', '📋 复制表格文本'];
+
+          wx.showActionSheet({
+            itemList,
+            success: (actionRes) => {
+              if (actionRes.tapIndex === 0) {
+                if (isPC) {
+                  saveToDisk();
+                } else {
+                  shareDirectly();
+                }
+              } else if (actionRes.tapIndex === 1) {
+                openDirectly();
+              } else if (actionRes.tapIndex === 2) {
+                wx.setClipboardData({
+                  data: csvContent,
+                  success: () => {
+                    wx.showToast({ title: '表格文本已复制', icon: 'success' });
+                  }
+                });
+              }
+            },
+            fail: () => {}
+          });
+        },
+        fail: (writeErr) => {
+          wx.hideLoading();
+          console.error('Write xlsx fail:', writeErr);
+          wx.setClipboardData({
+            data: csvContent,
+            success: () => {
+              wx.showModal({
+                title: '表格写入受限',
+                content: '本地暂存文件写入受限，已将表格文本内容完整复制到剪贴板，可直接粘贴到电脑微信或 Excel 中。',
+                showCancel: false
+              });
+            }
+          });
+        }
+      });
+    } catch (e) {
+      wx.hideLoading();
+      console.error('Export excel error:', e);
+      wx.showToast({ title: '导出失败: ' + e.message, icon: 'none' });
+    }
   },
+
 
   openImportSheet() {
     wx.showActionSheet({

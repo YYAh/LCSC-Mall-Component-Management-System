@@ -44,5 +44,6 @@
     ]
   },
   "style": "v2",
+  "resizable": true,
   "sitemapLocation": "sitemap.json"
 }

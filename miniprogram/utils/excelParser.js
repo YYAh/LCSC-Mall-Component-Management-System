@@ -459,8 +459,230 @@ function parseExcelData(fileBufferOrText) {
   return [];
 }
 
+// ==========================================
+// Pure JavaScript XLSX Generator (Zero-dependency)
+// ==========================================
+
+const crcTable = (function () {
+  let c;
+  const table = [];
+  for (let n = 0; n < 256; n++) {
+    c = n;
+    for (let k = 0; k < 8; k++) {
+      c = ((c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1));
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(buf) {
+  let crc = 0 ^ (-1);
+  for (let i = 0; i < buf.length; i++) {
+    crc = (crc >>> 8) ^ crcTable[(crc ^ buf[i]) & 0xFF];
+  }
+  return (crc ^ (-1)) >>> 0;
+}
+
+function strToUtf8(str) {
+  const utf8 = [];
+  for (let i = 0; i < str.length; i++) {
+    let charcode = str.charCodeAt(i);
+    if (charcode < 0x80) utf8.push(charcode);
+    else if (charcode < 0x800) {
+      utf8.push(0xc0 | (charcode >> 6), 0x80 | (charcode & 0x3f));
+    } else if (charcode < 0xd800 || charcode >= 0xe000) {
+      utf8.push(0xe0 | (charcode >> 12), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
+    } else {
+      i++;
+      charcode = 0x10000 + (((charcode & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+      utf8.push(0xf0 | (charcode >> 18), 0x80 | ((charcode >> 12) & 0x3f), 0x80 | ((charcode >> 6) & 0x3f), 0x80 | (charcode & 0x3f));
+    }
+  }
+  return new Uint8Array(utf8);
+}
+
+function createZip(files) {
+  const fileRecords = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const nameBytes = strToUtf8(f.name);
+    const dataBytes = typeof f.data === 'string' ? strToUtf8(f.data) : f.data;
+    const crc = crc32(dataBytes);
+    const size = dataBytes.length;
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    const view = new DataView(localHeader.buffer);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 0x0800, true);
+    view.setUint16(8, 0, true);
+    view.setUint16(10, 0, true);
+    view.setUint16(12, 0, true);
+    view.setUint32(14, crc, true);
+    view.setUint32(18, size, true);
+    view.setUint32(22, size, true);
+    view.setUint16(26, nameBytes.length, true);
+    view.setUint16(28, 0, true);
+    localHeader.set(nameBytes, 30);
+
+    fileRecords.push({ localHeader, dataBytes, nameBytes, crc, size, offset });
+    offset += localHeader.length + dataBytes.length;
+  }
+
+  const cdOffset = offset;
+  const cdEntries = [];
+  let cdSize = 0;
+
+  for (const r of fileRecords) {
+    const cd = new Uint8Array(46 + r.nameBytes.length);
+    const view = new DataView(cd.buffer);
+    view.setUint32(0, 0x02014b50, true);
+    view.setUint16(4, 20, true);
+    view.setUint16(6, 20, true);
+    view.setUint16(8, 0x0800, true);
+    view.setUint16(10, 0, true);
+    view.setUint16(12, 0, true);
+    view.setUint16(14, 0, true);
+    view.setUint32(16, r.crc, true);
+    view.setUint32(20, r.size, true);
+    view.setUint32(24, r.size, true);
+    view.setUint16(28, r.nameBytes.length, true);
+    view.setUint16(30, 0, true);
+    view.setUint16(32, 0, true);
+    view.setUint16(34, 0, true);
+    view.setUint16(36, 0, true);
+    view.setUint32(38, 0, true);
+    view.setUint32(42, r.offset, true);
+    cd.set(r.nameBytes, 46);
+
+    cdEntries.push(cd);
+    cdSize += cd.length;
+  }
+
+  const eocd = new Uint8Array(22);
+  const eView = new DataView(eocd.buffer);
+  eView.setUint32(0, 0x06054b50, true);
+  eView.setUint16(4, 0, true);
+  eView.setUint16(6, 0, true);
+  eView.setUint16(8, fileRecords.length, true);
+  eView.setUint16(10, fileRecords.length, true);
+  eView.setUint32(12, cdSize, true);
+  eView.setUint32(16, cdOffset, true);
+  eView.setUint16(20, 0, true);
+
+  const totalLength = cdOffset + cdSize + 22;
+  const out = new Uint8Array(totalLength);
+  let pos = 0;
+  for (const r of fileRecords) {
+    out.set(r.localHeader, pos);
+    pos += r.localHeader.length;
+    out.set(r.dataBytes, pos);
+    pos += r.dataBytes.length;
+  }
+  for (const cd of cdEntries) {
+    out.set(cd, pos);
+    pos += cd.length;
+  }
+  out.set(eocd, pos);
+
+  return out.buffer;
+}
+
+/**
+ * Generate XLSX ArrayBuffer from rows
+ * @param {Array<Array<any>>} rows 2D array of data
+ * @param {string} sheetName WorkSheet title
+ * @returns {ArrayBuffer}
+ */
+function generateXlsx(rows, sheetName = '元器件库存') {
+  function escapeXml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function getColLetter(colIdx) {
+    let temp = '';
+    let num = colIdx + 1;
+    while (num > 0) {
+      let rem = (num - 1) % 26;
+      temp = String.fromCharCode(65 + rem) + temp;
+      num = Math.floor((num - 1) / 26);
+    }
+    return temp;
+  }
+
+  let sheetDataXml = '<sheetData>';
+  for (let r = 0; r < rows.length; r++) {
+    const row = rows[r];
+    const rowNum = r + 1;
+    sheetDataXml += `<row r="${rowNum}">`;
+    for (let c = 0; c < row.length; c++) {
+      const cellVal = row[c];
+      const cellRef = `${getColLetter(c)}${rowNum}`;
+      if (cellVal === null || cellVal === undefined || cellVal === '') {
+        continue;
+      }
+      if (typeof cellVal === 'number' && !isNaN(cellVal)) {
+        sheetDataXml += `<c r="${cellRef}"><v>${cellVal}</v></c>`;
+      } else {
+        const escaped = escapeXml(String(cellVal));
+        sheetDataXml += `<c r="${cellRef}" t="inlineStr"><is><t>${escaped}</t></is></c>`;
+      }
+    }
+    sheetDataXml += '</row>';
+  }
+  sheetDataXml += '</sheetData>';
+
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`;
+
+  const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+  const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`;
+
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheets><sheet name="${escapeXml(sheetName)}" sheetId="1" r:id="rId1"/></sheets>
+</workbook>`;
+
+  const worksheetXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+${sheetDataXml}
+</worksheet>`;
+
+  const files = [
+    { name: '[Content_Types].xml', data: contentTypesXml },
+    { name: '_rels/.rels', data: rootRelsXml },
+    { name: 'xl/_rels/workbook.xml.rels', data: workbookRelsXml },
+    { name: 'xl/workbook.xml', data: workbookXml },
+    { name: 'xl/worksheets/sheet1.xml', data: worksheetXml }
+  ];
+
+  return createZip(files);
+}
+
 module.exports = {
   parseExcelData,
   parseCsvOrTsv,
-  convertRowsToComponents
+  convertRowsToComponents,
+  generateXlsx
 };
+
