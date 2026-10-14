@@ -787,14 +787,6 @@ Page({
     });
   },
 
-  goToPrintSaved() {
-    const item = this.data.autoSavedItem;
-    if (!item) return;
-    wx.navigateTo({
-      url: `/pages/print/print?id=${item.id || item._id}`
-    });
-  },
-
   goToDetailSaved() {
     const item = this.data.autoSavedItem;
     if (!item) return;

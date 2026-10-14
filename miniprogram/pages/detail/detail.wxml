@@ -149,7 +149,7 @@
   <!-- Fixed Bottom Bar -->
   <view class="detail-bottom-bar">
     <button class="bottom-btn btn-danger-outline" bindtap="deleteComponent">🗑️ 删除物料</button>
-    <button class="bottom-btn btn-primary" bindtap="goToPrint">🖨️ 打印专属标签</button>
+    <button class="bottom-btn btn-primary" bindtap="openEditModal">✏️ 修改物料信息</button>
   </view>
 
   <!-- Edit Component Modal (Matching Image 3) -->

@@ -5,11 +5,11 @@
     <view class="header-top">
       <view>
         <view class="header-title">元器件仓库看板</view>
-        <view class="header-sub">样品册 12 行精准定位 · 多端同步</view>
+        <view class="header-sub">样品册 12 行精准定位 · 纯本地单机</view>
       </view>
-      <view class="server-status {{isConnected ? 'online' : 'offline'}}" bindtap="goToSettings">
+      <view class="server-status online" bindtap="goToSettings">
         <text class="status-dot"></text>
-        <text>{{isConnected ? '服务已连接' : '未连接服务'}}</text>
+        <text>本地离线运行</text>
       </view>
     </view>
 
@@ -60,11 +60,11 @@
       </view>
     </view>
 
-    <view class="action-btn print-btn" bindtap="goToPrint">
-      <view class="action-icon">🖨️</view>
+    <view class="action-btn export-btn" bindtap="goToExport">
+      <view class="action-icon">📊</view>
       <view class="action-text">
-        <view class="action-title">标签打印</view>
-        <view class="action-desc">蓝牙便携打印专属标签</view>
+        <view class="action-title">Excel 导入导出</view>
+        <view class="action-desc">物料清单表格导出与备份</view>
       </view>
     </view>
   </view>

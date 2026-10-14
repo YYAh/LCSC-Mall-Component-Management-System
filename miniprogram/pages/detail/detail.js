@@ -226,11 +226,6 @@ Page({
     }
   },
 
-  goToPrint() {
-    wx.navigateTo({
-      url: `/pages/print/print?id=${this.data.comp.id || this.data.comp._id}`
-    });
-  },
 
   deleteComponent() {
     wx.showModal({

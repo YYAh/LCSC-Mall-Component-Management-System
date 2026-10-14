@@ -5,7 +5,6 @@
     "pages/components/components",
     "pages/detail/detail",
     "pages/books/books",
-    "pages/print/print",
     "pages/settings/settings"
   ],
   "window": {

@@ -360,13 +360,6 @@ Page({
     });
   },
 
-  quickPrint(e) {
-    const item = e.currentTarget.dataset.item;
-    wx.navigateTo({
-      url: `/pages/print/print?id=${item.id || item._id}`
-    });
-  },
-
   quickDelete(e) {
     const item = e.currentTarget.dataset.item;
     wx.showModal({

@@ -76,8 +76,8 @@ Page({
     wx.switchTab({ url: '/pages/books/books' });
   },
 
-  goToPrint() {
-    wx.navigateTo({ url: '/pages/print/print' });
+  goToExport() {
+    wx.switchTab({ url: '/pages/components/components' });
   },
 
   goToSettings() {

@@ -393,12 +393,6 @@
   border: 1px solid #b7eb8f;
 }
 
-.btn-print-mini {
-  background: #e6f7ff;
-  color: #096dd9;
-  border: 1px solid #91d5ff;
-}
-
 /* Bottom Floating Bar */
 .bottom-tools-bar {
   position: fixed;

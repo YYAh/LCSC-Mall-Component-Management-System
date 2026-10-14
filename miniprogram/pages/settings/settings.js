@@ -3,71 +3,10 @@ const api = require('../../utils/api');
 
 Page({
   data: {
-    engineMode: 'local',
-    serverUrl: 'http://127.0.0.1:3000',
-    testingServer: false,
-    seeding: false,
-    savedBle: null
+    seeding: false
   },
 
-  onShow() {
-    this.setData({
-      engineMode: api.getEngineMode(),
-      serverUrl: api.getServerUrl()
-    });
-    this.loadSavedBle();
-  },
-
-  changeEngineMode(e) {
-    const mode = e.currentTarget.dataset.mode;
-    api.setEngineMode(mode);
-    this.setData({ engineMode: mode });
-    let tip = '已切换至本地单机模式 (100% 免费)';
-    if (mode === 'rest') tip = '已切换至局域网自建服务器模式';
-    wx.showToast({ title: tip, icon: 'none' });
-  },
-
-  onServerUrlInput(e) {
-    this.setData({ serverUrl: e.detail.value });
-  },
-
-  async saveAndTestServer() {
-    const cleanUrl = api.setServerUrl(this.data.serverUrl);
-    this.setData({ serverUrl: cleanUrl, testingServer: true });
-    wx.showLoading({ title: '测试局域网连接...' });
-
-    try {
-      const res = await api.getDashboard();
-      wx.hideLoading();
-      this.setData({ testingServer: false });
-      if (res && res.success) {
-        wx.showModal({
-          title: '✅ 局域网服务器连接成功！',
-          content: `已成功连接到后端服务 (${cleanUrl})！\n• 库中元器件数: ${res.data.total_components} 种\n• 总库存: ${res.data.total_stock} 个\n• 样品册与元件盒: ${res.data.total_books} 个`,
-          showCancel: false
-        });
-      }
-    } catch (err) {
-      wx.hideLoading();
-      this.setData({ testingServer: false });
-      wx.showModal({
-        title: '连接失败',
-        content: `无法连接到 ${cleanUrl}\n\n请检查：\n1. 电脑是否双击运行了【启动后端服务.bat】？\n2. 手机和电脑是否连接在同一个 WiFi 局域网下？\n3. 填写的 IP 是否是电脑的局域网 IP（如 192.168.x.x）？`,
-        showCancel: false
-      });
-    }
-  },
-
-  loadSavedBle() {
-    const saved = wx.getStorageSync('LAST_BLE_DEVICE');
-    this.setData({ savedBle: saved && saved.deviceId ? saved : null });
-  },
-
-  clearSavedBle() {
-    wx.removeStorageSync('LAST_BLE_DEVICE');
-    this.setData({ savedBle: null });
-    wx.showToast({ title: '已清除打印机绑定', icon: 'none' });
-  },
+  onShow() {},
 
   async seedDemoData() {
     this.setData({ seeding: true });

@@ -124,16 +124,13 @@
 
     <!-- Quick action buttons -->
     <view class="success-actions">
-      <button class="btn-primary flex-1" bindtap="goToPrintSaved">
-        🖨️ 立即打印专属标签
-      </button>
       <button class="btn-success flex-1" bindtap="scanNext">
         📷 继续扫下一个 (已就绪)
       </button>
+      <button class="btn-secondary flex-1" bindtap="goToDetailSaved">
+        🔍 查看详情与修改
+      </button>
     </view>
-    <button class="btn-secondary" style="margin-top: 16rpx;" bindtap="goToDetailSaved">
-      🔍 查看物料详情与修改
-    </button>
   </view>
 
   <!-- Manual Edit Form (Shown when user wants to edit before saving) -->

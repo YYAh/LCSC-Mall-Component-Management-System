@@ -113,9 +113,6 @@
         <button class="action-card-btn btn-in-mini" catchtap="quickIn" data-item="{{item}}">
           + 入库
         </button>
-        <button class="action-card-btn btn-print-mini" catchtap="quickPrint" data-item="{{item}}">
-          🖨️ 打印
-        </button>
       </view>
     </view>
   </view>

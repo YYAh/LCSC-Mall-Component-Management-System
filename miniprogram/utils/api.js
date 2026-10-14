@@ -8,26 +8,12 @@ const qrParser = require('./qrParser');
 const { classifyComponent, decodeResistorSpec, decodeCapacitorSpec } = require('./classifier');
 
 function getEngineMode() {
-  return wx.getStorageSync('ENGINE_MODE') || 'local';
+  return 'local';
 }
 
-function setEngineMode(mode) {
-  wx.setStorageSync('ENGINE_MODE', mode);
-}
-
-function getServerUrl() {
-  const custom = wx.getStorageSync('SERVER_URL');
-  return custom ? custom.replace(/\/+$/, '') : 'http://127.0.0.1:3000';
-}
-
-function setServerUrl(url) {
-  let cleanUrl = url ? url.trim().replace(/\/+$/, '') : 'http://127.0.0.1:3000';
-  if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-    cleanUrl = 'http://' + cleanUrl;
-  }
-  wx.setStorageSync('SERVER_URL', cleanUrl);
-  return cleanUrl;
-}
+function setEngineMode() {}
+function getServerUrl() { return ''; }
+function setServerUrl() { return ''; }
 
 // Category to Book Mapping Helper (52+ Categories)
 const CATEGORY_TO_BOOK_MAP = {
