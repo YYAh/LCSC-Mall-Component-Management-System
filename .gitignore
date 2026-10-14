@@ -15,3 +15,7 @@ backend/data/*.db
 # IDE & Editor
 .vscode/
 .idea/
+
+# Temp user screenshots
+assets/screenshots/
+
